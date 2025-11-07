@@ -36,7 +36,13 @@ const Button = ({
   const getButtonStyles = () => {
     const baseStyles = [styles.button, styles[`button_${size}`]];
     
-    if (fullWidth) baseStyles.push(styles.fullWidth);
+    // Modified: Only add fullWidth style if explicitly true
+    if (fullWidth === true) {
+      baseStyles.push(styles.fullWidth);
+    } else if (fullWidth === false) {
+      baseStyles.push(styles.flexWidth);
+    }
+    
     if (variant === 'outline') baseStyles.push(styles.outlineButton);
     if (variant === 'ghost') baseStyles.push(styles.ghostButton);
     if (variant === 'secondary') baseStyles.push(styles.secondaryButton);
@@ -65,6 +71,12 @@ const Button = ({
     return Colors.white;
   };
 
+  const getIconColor = () => {
+    if (variant === 'outline' || variant === 'ghost') return Colors.primary;
+    if (variant === 'secondary') return Colors.primary;
+    return Colors.white;
+  };
+
   const renderContent = () => (
     <>
       {loading ? (
@@ -75,7 +87,7 @@ const Button = ({
             <Icon
               name={icon}
               size={size === 'small' ? 16 : size === 'large' ? 24 : 20}
-              color={getTextStyles().color || Colors.white}
+              color={getIconColor()}
               style={styles.leftIcon}
             />
           )}
@@ -86,7 +98,7 @@ const Button = ({
             <Icon
               name={icon}
               size={size === 'small' ? 16 : size === 'large' ? 24 : 20}
-              color={getTextStyles().color || Colors.white}
+              color={getIconColor()}
               style={styles.rightIcon}
             />
           )}
@@ -95,12 +107,15 @@ const Button = ({
     </>
   );
 
+  // Modified: Container view styling
+  const containerStyle = fullWidth === true ? styles.fullWidth : fullWidth === false ? styles.flexWidth : null;
+
   if (gradient && variant === 'primary' && !isDisabled) {
     return (
       <Animatable.View
         animation="fadeIn"
         duration={300}
-        style={[fullWidth && styles.fullWidth]}>
+        style={containerStyle}>
         <TouchableOpacity
           onPress={onPress}
           disabled={isDisabled}
@@ -122,7 +137,7 @@ const Button = ({
     <Animatable.View
       animation="fadeIn"
       duration={300}
-      style={[fullWidth && styles.fullWidth]}>
+      style={containerStyle}>
       <TouchableOpacity
         style={getButtonStyles()}
         onPress={onPress}
@@ -146,6 +161,9 @@ const styles = StyleSheet.create({
   },
   fullWidth: {
     width: '100%',
+  },
+  flexWidth: {
+    flex: 1, // Added: Allows button to take flex space from parent
   },
   
   // Size variations

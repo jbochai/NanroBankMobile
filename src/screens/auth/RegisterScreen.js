@@ -171,36 +171,40 @@ const RegisterScreen = () => {
   };
 
   const renderStepIndicator = () => (
-    <View style={styles.stepIndicator}>
-      {[1, 2, 3].map((step) => (
-        <View key={step} style={styles.stepItem}>
-          <View
-            style={[
-              styles.stepCircle,
-              currentStep >= step && styles.stepCircleActive,
-            ]}>
-            {currentStep > step ? (
-              <Icon name="check" size={16} color={Colors.white} />
-            ) : (
-              <Text
+    <View style={styles.stepIndicatorContainer}>
+      <View style={styles.stepIndicator}>
+        {[1, 2, 3].map((step) => (
+          <React.Fragment key={step}>
+            <View style={styles.stepItem}>
+              <View
                 style={[
-                  styles.stepNumber,
-                  currentStep >= step && styles.stepNumberActive,
+                  styles.stepCircle,
+                  currentStep >= step && styles.stepCircleActive,
                 ]}>
-                {step}
-              </Text>
+                {currentStep > step ? (
+                  <Icon name="check" size={16} color={Colors.white} />
+                ) : (
+                  <Text
+                    style={[
+                      styles.stepNumber,
+                      currentStep >= step && styles.stepNumberActive,
+                    ]}>
+                    {step}
+                  </Text>
+                )}
+              </View>
+            </View>
+            {step < 3 && (
+              <View
+                style={[
+                  styles.stepLine,
+                  currentStep > step && styles.stepLineActive,
+                ]}
+              />
             )}
-          </View>
-          {step < 3 && (
-            <View
-              style={[
-                styles.stepLine,
-                currentStep > step && styles.stepLineActive,
-              ]}
-            />
-          )}
-        </View>
-      ))}
+          </React.Fragment>
+        ))}
+      </View>
     </View>
   );
 
@@ -252,7 +256,7 @@ const RegisterScreen = () => {
             <Text style={styles.datePickerLabel}>Date of Birth *</Text>
             <View style={styles.datePickerInput}>
               <Icon name="calendar-today" size={20} color={Colors.textLight} />
-              <Text style={styles.datePickerValue}>
+              <Text style={[styles.datePickerValue, !value && styles.datePickerPlaceholder]}>
                 {value ? value.toLocaleDateString() : 'Select date of birth'}
               </Text>
             </View>
@@ -433,6 +437,7 @@ const RegisterScreen = () => {
           onPress={previousStep}
           variant="outline"
           style={styles.halfButton}
+          fullWidth={false}  // Add this prop
         />
         <Button
           title="Next"
@@ -440,6 +445,7 @@ const RegisterScreen = () => {
           icon="arrow-forward"
           iconPosition="right"
           style={styles.halfButton}
+          fullWidth={false}  // Add this prop
         />
       </View>
     </Animatable.View>
@@ -513,6 +519,7 @@ const RegisterScreen = () => {
           onPress={previousStep}
           variant="outline"
           style={styles.halfButton}
+          fullWidth={false}  // Add this prop
         />
         <Button
           title="Register"
@@ -520,6 +527,7 @@ const RegisterScreen = () => {
           loading={isLoading}
           style={styles.halfButton}
           gradient
+          fullWidth={false}  // Add this prop
         />
       </View>
     </Animatable.View>
@@ -573,14 +581,10 @@ const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
-  // scrollContent: {
-  //   flexGrow: 1,
-  //   paddingBottom: Spacing.xl,
-  // },
   scrollContent: {
-  flexGrow: 1,
-  paddingBottom: Spacing.xl * 3, // Increase from Spacing.xl to Spacing.xl * 3
-},
+    flexGrow: 1,
+    paddingBottom: Spacing.xl * 2,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -597,22 +601,22 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.semiBold,
     color: Colors.text,
   },
+  stepIndicatorContainer: {
+    paddingVertical: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
+  },
   stepIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.xl,
-    paddingHorizontal: Spacing.lg,
   },
   stepItem: {
-    flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
   },
   stepCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
@@ -621,7 +625,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   stepNumber: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: Fonts.semiBold,
     color: Colors.textLight,
   },
@@ -629,7 +633,7 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
   stepLine: {
-    flex: 1,
+    width: 60,
     height: 2,
     backgroundColor: Colors.border,
     marginHorizontal: Spacing.xs,
@@ -637,13 +641,10 @@ const styles = StyleSheet.create({
   stepLineActive: {
     backgroundColor: Colors.primary,
   },
-  // formContainer: {
-  //   paddingHorizontal: Spacing.lg,
-  // },
   formContainer: {
-  paddingHorizontal: Spacing.lg,
-  paddingBottom: Spacing.xl, // Add this line
-},
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xl,
+  },
   stepTitle: {
     fontSize: 18,
     fontFamily: Fonts.semiBold,
@@ -654,7 +655,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   datePickerLabel: {
-    ...Typography.label,
+    fontSize: 14,
+    fontFamily: Fonts.medium,
     color: Colors.text,
     marginBottom: Spacing.xs,
   },
@@ -671,20 +673,25 @@ const styles = StyleSheet.create({
   datePickerValue: {
     marginLeft: Spacing.sm,
     fontSize: 16,
+    fontFamily: Fonts.regular,
     color: Colors.text,
     flex: 1,
+  },
+  datePickerPlaceholder: {
+    color: Colors.textLight,
   },
   genderContainer: {
     marginBottom: Spacing.lg,
   },
   genderLabel: {
-    ...Typography.label,
+    fontSize: 14,
+    fontFamily: Fonts.medium,
     color: Colors.text,
     marginBottom: Spacing.xs,
   },
   genderOptions: {
     flexDirection: 'row',
-    gap: Spacing.md,
+    justifyContent: 'space-between',
   },
   genderOption: {
     flex: 1,
@@ -696,6 +703,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: 8,
     backgroundColor: Colors.white,
+    marginHorizontal: 4,
   },
   genderOptionActive: {
     backgroundColor: Colors.primary,
@@ -710,25 +718,16 @@ const styles = StyleSheet.create({
   genderTextActive: {
     color: Colors.white,
   },
-  //buttonRow: {
-  //   flexDirection: 'row',
-  //   gap: Spacing.md,
-  //   marginTop: Spacing.lg,
-  // },
-  // halfButton: {
-  //   flex: 1,
-  // },
   buttonRow: {
   flexDirection: 'row',
   justifyContent: 'space-between',
   marginTop: Spacing.lg,
-  marginBottom: Spacing.xl, // Add bottom margin
-  paddingHorizontal: Spacing.xs, // Add horizontal padding
+  gap: Spacing.sm, // Add gap between buttons
 },
-halfButton: {
-  flex: 1,
-  marginHorizontal: Spacing.xs, // Add spacing between buttons
-},
+  halfButton: {
+    flex: 1,
+    marginHorizontal: 4,
+  },
   termsContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -756,15 +755,15 @@ halfButton: {
     textDecorationLine: 'underline',
   },
   errorText: {
-    ...Typography.caption,
+    fontSize: 12,
+    fontFamily: Fonts.regular,
     color: Colors.error,
     marginTop: Spacing.xs,
-    marginLeft: Spacing.xs,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: Spacing.xl,
+    paddingVertical: Spacing.xl,
     paddingHorizontal: Spacing.lg,
   },
   footerText: {
@@ -780,4 +779,3 @@ halfButton: {
 });
 
 export default RegisterScreen;
-
