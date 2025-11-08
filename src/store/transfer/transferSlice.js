@@ -19,7 +19,7 @@ const initialState = {
 
 // Async thunks
 export const intraBankTransfer = createAsyncThunk(
-  'transfer/intraBankTransfer',
+  'transfer/intra-bank',
   async (transferData, { rejectWithValue }) => {
     try {
       const response = await TransferService.intraBankTransfer(transferData);
@@ -35,7 +35,7 @@ export const intraBankTransfer = createAsyncThunk(
 );
 
 export const interBankTransfer = createAsyncThunk(
-  'transfer/interBankTransfer',
+  'transfer/inter-bank',
   async (transferData, { rejectWithValue }) => {
     try {
       const response = await TransferService.interBankTransfer(transferData);
@@ -51,7 +51,7 @@ export const interBankTransfer = createAsyncThunk(
 );
 
 export const verifyAccount = createAsyncThunk(
-  'transfer/verifyAccount',
+  'transfer/verify-account',
   async (accountData, { rejectWithValue }) => {
     try {
       const response = await TransferService.verifyAccount(accountData);

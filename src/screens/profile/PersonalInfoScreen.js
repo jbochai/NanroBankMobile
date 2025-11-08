@@ -15,6 +15,8 @@ import { selectUser } from '../../store/auth/authSlice';
 import { Colors } from '../../styles/colors';
 import { Fonts } from '../../styles/fonts';
 import { Spacing } from '../../styles/spacing';
+import { getImageUrl } from '../../api/client';
+
 
 const PersonalInfoScreen = () => {
   const navigation = useNavigation();
@@ -120,7 +122,7 @@ const PersonalInfoScreen = () => {
           <View style={styles.avatarContainer}>
             {user?.profile_photo ? (
               <Image
-                source={{ uri: user.profile_photo }}
+                source={{ uri: getImageUrl(user.profile_photo) }}
                 style={styles.avatar}
               />
             ) : (
@@ -142,6 +144,10 @@ const PersonalInfoScreen = () => {
             </Text>
           </View>
         </View>
+        
+        {/*  */}
+
+        {/*  */}
 
         <View style={styles.infoSection}>
           <Text style={styles.sectionTitle}>Account Information</Text>

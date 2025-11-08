@@ -14,6 +14,7 @@ const initialState = {
   maxLoginAttempts: 3,
   isAccountLocked: false,
   lockoutEndTime: null,
+  isLocked: false, // Added for idle timeout screen lock
 };
 
 // Async thunks
@@ -113,6 +114,25 @@ export const setupBiometric = createAsyncThunk(
   }
 );
 
+// export const checkAuthStatus = createAsyncThunk(
+//   'auth/checkStatus',
+//   async (_, { rejectWithValue }) => {
+//     try {
+//       const isAuth = await AuthService.isAuthenticated();
+//       if (isAuth) {
+//         const userData = await EncryptedStorage.getItem('user_data');
+//         const biometricEnabled = await AuthService.isBiometricEnabled();
+//         return {
+//           user: userData ? JSON.parse(userData) : null,
+//           biometricEnabled,
+//         };
+//       }
+//       return null;
+//     } catch (error) {
+//       return rejectWithValue(error.message);
+//     }
+//   }
+// );
 export const checkAuthStatus = createAsyncThunk(
   'auth/checkStatus',
   async (_, { rejectWithValue }) => {
@@ -120,15 +140,59 @@ export const checkAuthStatus = createAsyncThunk(
       const isAuth = await AuthService.isAuthenticated();
       if (isAuth) {
         const userData = await EncryptedStorage.getItem('user_data');
-        const biometricEnabled = await AuthService.isBiometricEnabled();
+        const user = userData ? JSON.parse(userData) : null;
+        
+        // Sync biometric enabled from user data
+        const biometricEnabled = user?.biometric_enabled || false;
+        
+        // Also check local storage
+        const localBiometricEnabled = await AuthService.isBiometricEnabled();
+        
+        console.log('CheckAuthStatus - User biometric_enabled:', user?.biometric_enabled);
+        console.log('CheckAuthStatus - Local biometric enabled:', localBiometricEnabled);
+        
         return {
-          user: userData ? JSON.parse(userData) : null,
-          biometricEnabled,
+          user: user,
+          biometricEnabled: biometricEnabled || localBiometricEnabled,
         };
       }
       return null;
     } catch (error) {
       return rejectWithValue(error.message);
+    }
+  }
+);
+// New: Unlock screen after idle timeout
+export const unlockScreen = createAsyncThunk(
+  'auth/unlockScreen',
+  async (password, { rejectWithValue, getState }) => {
+    try {
+      const { user } = getState().auth;
+      
+      // If biometric unlock
+      if (password?.biometric) {
+        return { success: true };
+      }
+      
+      // Verify password with stored credentials or backend
+      const storedPassword = await EncryptedStorage.getItem('user_password');
+      
+      if (storedPassword === password) {
+        return { success: true };
+      }
+      
+      // Optionally verify with backend
+      // const response = await AuthService.verifyPassword({
+      //   email: user.email,
+      //   password: password,
+      // });
+      // if (response.success) {
+      //   return { success: true };
+      // }
+      
+      return rejectWithValue('Invalid password');
+    } catch (error) {
+      return rejectWithValue(error.message || 'Invalid password');
     }
   }
 );
@@ -150,7 +214,7 @@ const authSlice = createSlice({
       state.loginAttempts += 1;
       if (state.loginAttempts >= state.maxLoginAttempts) {
         state.isAccountLocked = true;
-        state.lockoutEndTime = Date.now() + 2 * 60 * 1000; // 2 minutes lockout // 30 * 60 * 1000 = 30mins
+        state.lockoutEndTime = Date.now() + 2 * 60 * 1000; // 2 minutes lockout
       }
     },
     updateSessionTimeout: (state, action) => {
@@ -160,6 +224,16 @@ const authSlice = createSlice({
       state.user = null;
       state.isAuthenticated = false;
       state.sessionTimeout = null;
+    },
+    lockScreen: (state) => {
+      state.isLocked = true;
+    },
+    unlockScreenSuccess: (state) => {
+      state.isLocked = false;
+      state.error = null;
+    },
+    setBiometricEnabled: (state, action) => {
+      state.biometricEnabled = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -173,6 +247,7 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.user = action.payload.user;
         state.isAuthenticated = true;
+        state.isLocked = false;
         state.loginAttempts = 0;
         state.isAccountLocked = false;
         state.lockoutEndTime = null;
@@ -198,6 +273,7 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.user = action.payload.user;
         state.isAuthenticated = true;
+        state.isLocked = false;
         state.sessionTimeout = Date.now() + 5 * 60 * 1000;
       })
       .addCase(biometricLogin.rejected, (state, action) => {
@@ -215,6 +291,7 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.user = action.payload.user;
         state.isAuthenticated = true;
+        state.isLocked = false;
         state.sessionTimeout = Date.now() + 5 * 60 * 1000;
       })
       .addCase(register.rejected, (state, action) => {
@@ -233,6 +310,7 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.biometricEnabled = false;
         state.sessionTimeout = null;
+        state.isLocked = false;
         state.error = null;
       })
       .addCase(logout.rejected, (state) => {
@@ -242,6 +320,7 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.biometricEnabled = false;
         state.sessionTimeout = null;
+        state.isLocked = false;
       });
 
     // Get Me
@@ -284,6 +363,22 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.isAuthenticated = false;
       });
+
+    // Unlock Screen
+    builder
+      .addCase(unlockScreen.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(unlockScreen.fulfilled, (state) => {
+        state.isLoading = false;
+        state.isLocked = false;
+        state.error = null;
+      })
+      .addCase(unlockScreen.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      });
   },
 });
 
@@ -294,6 +389,9 @@ export const {
   incrementLoginAttempts,
   updateSessionTimeout,
   sessionExpired,
+  lockScreen,
+  unlockScreenSuccess,
+  setBiometricEnabled,
 } = authSlice.actions;
 
 // Export reducer
@@ -308,3 +406,4 @@ export const selectError = (state) => state.auth.error;
 export const selectBiometricEnabled = (state) => state.auth.biometricEnabled;
 export const selectIsAccountLocked = (state) => state.auth.isAccountLocked;
 export const selectLockoutEndTime = (state) => state.auth.lockoutEndTime;
+export const selectIsLocked = (state) => state.auth.isLocked;

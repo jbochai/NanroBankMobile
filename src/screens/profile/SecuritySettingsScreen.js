@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,30 +6,277 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
+  Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import ReactNativeBiometrics from 'react-native-biometrics';
 import Toast from 'react-native-toast-message';
-import { selectUser, selectBiometricEnabled } from '../../store/auth/authSlice';
+
+import { 
+  selectUser, 
+  selectBiometricEnabled,
+  setBiometricEnabled,
+} from '../../store/auth/authSlice';
+import AuthService from '../../api/auth';
+import PinInputModal from '../../components/common/PinInputModal';
 import { Colors } from '../../styles/colors';
 import { Fonts } from '../../styles/fonts';
 import { Spacing } from '../../styles/spacing';
 
 const SecuritySettingsScreen = () => {
   const navigation = useNavigation();
+  const dispatch = useDispatch();
   const user = useSelector(selectUser);
   const biometricEnabled = useSelector(selectBiometricEnabled);
 
   const [settings, setSettings] = useState({
-    biometric: biometricEnabled || false,
+    biometric: false,
     twoFactor: false,
     loginNotifications: true,
     transactionAlerts: true,
   });
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricType, setBiometricType] = useState('');
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinModalConfig, setPinModalConfig] = useState({
+    title: '',
+    message: '',
+    action: null,
+  });
+
+  const rnBiometrics = new ReactNativeBiometrics();
+
+  useEffect(() => {
+    checkBiometricAvailability();
+    loadSettings();
+  }, []);
+
+  useEffect(() => {
+    // Sync with Redux state
+    setSettings(prev => ({
+      ...prev,
+      biometric: biometricEnabled,
+    }));
+  }, [biometricEnabled]);
+
+  const checkBiometricAvailability = async () => {
+    try {
+      const { available, biometryType } = await rnBiometrics.isSensorAvailable();
+      setBiometricAvailable(available);
+      setBiometricType(biometryType || 'Biometric');
+      
+      console.log('Biometric available:', available, 'Type:', biometryType);
+    } catch (error) {
+      console.error('Biometric check error:', error);
+      setBiometricAvailable(false);
+    }
+  };
+
+  const loadSettings = async () => {
+    try {
+      const isBiometricEnabled = await AuthService.isBiometricEnabled();
+      setSettings(prev => ({
+        ...prev,
+        biometric: isBiometricEnabled,
+      }));
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  };
+
+  const handleEnableBiometric = async (transactionPin) => {
+    try {
+      const setupResult = await AuthService.setupBiometric(transactionPin);
+      
+      if (setupResult.success) {
+        // Update Redux state
+        dispatch(setBiometricEnabled(true));
+        
+        // Update local state
+        setSettings(prev => ({
+          ...prev,
+          biometric: true,
+        }));
+        
+        Toast.show({
+          type: 'success',
+          text1: 'Biometric Enabled',
+          text2: `${biometricType} login has been enabled`,
+        });
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Setup Failed',
+          text2: setupResult.message || 'Failed to enable biometric',
+        });
+      }
+    } catch (error) {
+      console.error('Biometric setup error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Setup Failed',
+        text2: 'Failed to enable biometric authentication',
+      });
+    }
+    
+    setShowPinModal(false);
+  };
+
+  const handleDisableBiometric = async (transactionPin) => {
+    try {
+      const result = await AuthService.disableBiometric(transactionPin);
+      
+      if (result.success) {
+        // Update Redux state
+        dispatch(setBiometricEnabled(false));
+        
+        // Update local state
+        setSettings(prev => ({
+          ...prev,
+          biometric: false,
+        }));
+        
+        Toast.show({
+          type: 'success',
+          text1: 'Biometric Disabled',
+          text2: 'Biometric login has been disabled',
+        });
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Failed',
+          text2: result.message || 'Failed to disable biometric',
+        });
+      }
+    } catch (error) {
+      console.error('Biometric disable error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Failed',
+        text2: 'Failed to disable biometric authentication',
+      });
+    }
+    
+    setShowPinModal(false);
+  };
+
+  const handleBiometricToggle = async () => {
+    if (!biometricAvailable) {
+      Alert.alert(
+        'Biometric Not Available',
+        'Your device does not support biometric authentication.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    try {
+      if (!settings.biometric) {
+        // Enabling biometric
+        if (Platform.OS === 'ios') {
+          // Use Alert.prompt for iOS
+          Alert.prompt(
+            'Enable Biometric Login',
+            `Enter your 4-digit transaction PIN to enable ${biometricType} login`,
+            [
+              {
+                text: 'Cancel',
+                style: 'cancel',
+              },
+              {
+                text: 'Enable',
+                onPress: async (transactionPin) => {
+                  if (!transactionPin || transactionPin.length !== 4) {
+                    Toast.show({
+                      type: 'error',
+                      text1: 'Invalid PIN',
+                      text2: 'Please enter a 4-digit transaction PIN',
+                    });
+                    return;
+                  }
+                  await handleEnableBiometric(transactionPin);
+                },
+              },
+            ],
+            'secure-text'
+          );
+        } else {
+          // Use custom modal for Android
+          setPinModalConfig({
+            title: 'Enable Biometric Login',
+            message: `Enter your 4-digit transaction PIN to enable ${biometricType} login`,
+            action: 'enable',
+          });
+          setShowPinModal(true);
+        }
+      } else {
+        // Disabling biometric
+        if (Platform.OS === 'ios') {
+          // Use Alert.prompt for iOS
+          Alert.prompt(
+            'Disable Biometric Login',
+            'Enter your 4-digit transaction PIN to disable biometric login',
+            [
+              {
+                text: 'Cancel',
+                style: 'cancel',
+              },
+              {
+                text: 'Disable',
+                style: 'destructive',
+                onPress: async (transactionPin) => {
+                  if (!transactionPin || transactionPin.length !== 4) {
+                    Toast.show({
+                      type: 'error',
+                      text1: 'Invalid PIN',
+                      text2: 'Please enter a 4-digit transaction PIN',
+                    });
+                    return;
+                  }
+                  await handleDisableBiometric(transactionPin);
+                },
+              },
+            ],
+            'secure-text'
+          );
+        } else {
+          // Use custom modal for Android
+          setPinModalConfig({
+            title: 'Disable Biometric Login',
+            message: 'Enter your 4-digit transaction PIN to disable biometric login',
+            action: 'disable',
+          });
+          setShowPinModal(true);
+        }
+      }
+    } catch (error) {
+      console.error('Biometric toggle error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'An error occurred while updating biometric settings',
+      });
+    }
+  };
+
+  const handlePinSubmit = (pin) => {
+    if (pinModalConfig.action === 'enable') {
+      handleEnableBiometric(pin);
+    } else if (pinModalConfig.action === 'disable') {
+      handleDisableBiometric(pin);
+    }
+  };
 
   const toggleSetting = (key) => {
+    if (key === 'biometric') {
+      handleBiometricToggle();
+      return;
+    }
+
     setSettings(prev => ({
       ...prev,
       [key]: !prev[key],
@@ -114,15 +361,21 @@ const SecuritySettingsScreen = () => {
             <View style={styles.settingLeft}>
               <Icon name="fingerprint" size={24} color={Colors.primary} />
               <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>Biometric Login</Text>
+                <Text style={styles.settingTitle}>
+                  {biometricType || 'Biometric'} Login
+                </Text>
                 <Text style={styles.settingDescription}>
-                  Use fingerprint or face ID to login
+                  {biometricAvailable 
+                    ? `Use ${biometricType || 'biometric'} to login`
+                    : 'Not available on this device'
+                  }
                 </Text>
               </View>
             </View>
             <Switch
               value={settings.biometric}
               onValueChange={() => toggleSetting('biometric')}
+              disabled={!biometricAvailable}
               trackColor={{ false: Colors.border, true: Colors.primary + '50' }}
               thumbColor={settings.biometric ? Colors.primary : Colors.textLight}
             />
@@ -196,10 +449,19 @@ const SecuritySettingsScreen = () => {
           <Icon name="shield" size={24} color={Colors.success} />
           <Text style={styles.infoText}>
             Your account is secured with industry-standard encryption.
-            Last login: {user?.last_login_at ? new Date(user.last_login_at).toLocaleString() : 'N/A'}
+            {user?.last_login_at && `\nLast login: ${new Date(user.last_login_at).toLocaleString()}`}
           </Text>
         </View>
       </ScrollView>
+
+      {/* PIN Input Modal for Android */}
+      <PinInputModal
+        visible={showPinModal}
+        onClose={() => setShowPinModal(false)}
+        onSubmit={handlePinSubmit}
+        title={pinModalConfig.title}
+        message={pinModalConfig.message}
+      />
     </SafeAreaView>
   );
 };

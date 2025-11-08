@@ -22,7 +22,6 @@ import ReactNativeBiometrics from 'react-native-biometrics';
 import * as Animatable from 'react-native-animatable';
 import Toast from 'react-native-toast-message';
 
-
 import { 
   login, 
   biometricLogin, 
@@ -31,9 +30,11 @@ import {
   selectError,
   selectIsAccountLocked,
   selectLockoutEndTime,
+  setBiometricEnabled,
 } from '../../store/auth/authSlice';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
+import PinInputModal from '../../components/common/PinInputModal';
 import { Colors } from '../../styles/colors';
 import { Fonts } from '../../styles/fonts';
 import { Spacing } from '../../styles/spacing';
@@ -69,6 +70,7 @@ const LoginScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [lockoutTimeRemaining, setLockoutTimeRemaining] = useState(0);
+  const [showPinModal, setShowPinModal] = useState(false);
 
   const rnBiometrics = new ReactNativeBiometrics();
 
@@ -119,45 +121,84 @@ const LoginScreen = () => {
 
   const checkBiometricAvailability = async () => {
     try {
-      const { available } = await rnBiometrics.isSensorAvailable();
+      const { available, biometryType } = await rnBiometrics.isSensorAvailable();
       setBiometricAvailable(available);
+      
+      console.log('Biometric available:', available, 'Type:', biometryType);
       
       // Check if biometric login is set up
       const biometricEnabled = await AuthService.isBiometricEnabled();
+      console.log('Biometric enabled:', biometricEnabled);
+      
       if (available && biometricEnabled) {
         // Auto prompt for biometric login
-        handleBiometricLogin();
+        setTimeout(() => handleBiometricLogin(), 500);
       }
     } catch (error) {
       console.log('Biometric check error:', error);
     }
   };
 
-  const onSubmit = async (data) => {
-    if (isAccountLocked && lockoutTimeRemaining > 0) {
-      const minutes = Math.ceil(lockoutTimeRemaining / 60000);
-      Alert.alert(
-        'Account Locked',
-        `Too many failed login attempts. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`,
-      );
-      return;
-    }
+  // const onSubmit = async (data) => {
+  //   if (isAccountLocked && lockoutTimeRemaining > 0) {
+  //     const minutes = Math.ceil(lockoutTimeRemaining / 60000);
+  //     Alert.alert(
+  //       'Account Locked',
+  //       `Too many failed login attempts. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`,
+  //     );
+  //     return;
+  //   }
 
-    try {
-      const result = await dispatch(login(data)).unwrap();
+  //   try {
+  //     const result = await dispatch(login(data)).unwrap();
       
-      if (result) {
-        Toast.show({
-          type: 'success',
-          text1: 'Welcome Back!',
-          text2: `Hello, ${result.user.first_name}`,
-        });
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-    }
-  };
+  //     if (result) {
+  //       // Store password for unlock screen (encrypted)
+  //       await AuthService.storePassword(data.password);
+        
+  //       Toast.show({
+  //         type: 'success',
+  //         text1: 'Welcome Back!',
+  //         text2: `Hello, ${result.user.first_name}`,
+  //       });
 
+  //       // Don't prompt for biometric setup on login - let user enable it in settings
+  //     }
+  //   } catch (error) {
+  //     console.error('Login error:', error);
+  //   }
+  // };
+
+  const onSubmit = async (data) => {
+  if (isAccountLocked && lockoutTimeRemaining > 0) {
+    const minutes = Math.ceil(lockoutTimeRemaining / 60000);
+    Alert.alert(
+      'Account Locked',
+      `Too many failed login attempts. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`,
+    );
+    return;
+  }
+
+  try {
+    const result = await dispatch(login(data)).unwrap();
+    
+    if (result) {
+      // Store password for unlock screen (encrypted)
+      await AuthService.storePassword(data.password);
+      
+      // Refresh biometric availability after login
+      await checkBiometricAvailability();
+      
+      Toast.show({
+        type: 'success',
+        text1: 'Welcome Back!',
+        text2: `Hello, ${result.user.first_name}`,
+      });
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+  }
+};
   const handleBiometricLogin = async () => {
     try {
       const result = await dispatch(biometricLogin()).unwrap();
@@ -170,11 +211,9 @@ const LoginScreen = () => {
         });
       }
     } catch (error) {
-      Toast.show({
-        type: 'error',
-        text1: 'Biometric Login Failed',
-        text2: 'Please use your password to login',
-      });
+      console.error('Biometric login error:', error);
+      // Don't show error toast for biometric login failure
+      // User can still use password
     }
   };
 
@@ -202,12 +241,12 @@ const LoginScreen = () => {
               duration={1000}
               style={styles.logoContainer}>
               <View style={styles.logo}>
-              <Image 
-                source={require('../../assets/images/logo.png')}
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
-            </View>
+                <Image 
+                  source={require('../../assets/images/logo.png')}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              </View>
               <Text style={styles.appName}>Nanro Bank</Text>
               <Text style={styles.tagline}>Your Financial Partner</Text>
             </Animatable.View>
@@ -342,9 +381,9 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   logoImage: {
-  width: 50,
-  height: 50,
-},
+    width: 50,
+    height: 50,
+  },
   logoText: {
     fontSize: 32,
     fontFamily: Fonts.bold,
@@ -435,4 +474,3 @@ const styles = StyleSheet.create({
 });
 
 export default LoginScreen;
-
