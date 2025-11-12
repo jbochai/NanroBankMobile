@@ -1,18 +1,26 @@
 import React, { useEffect } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSelector, useDispatch } from 'react-redux';
 import SplashScreen from 'react-native-splash-screen';
 
-import { selectIsAuthenticated, checkAuthStatus } from '../store/slices/authSlice';
+import { 
+  selectIsAuthenticated, 
+  selectIsLocked,
+  checkAuthStatus 
+} from '../store/auth/authSlice';
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
+import LockScreen from '../screens/auth/LockScreen';
 import LoadingScreen from '../components/common/LoadingScreen';
+import ActivityDetector from '../components/common/ActivityDetector';
 
 const Stack = createNativeStackNavigator();
 
 const AppNavigator = () => {
   const dispatch = useDispatch();
   const isAuthenticated = useSelector(selectIsAuthenticated);
+  const isLocked = useSelector(selectIsLocked);
   const [isLoading, setIsLoading] = React.useState(true);
 
   useEffect(() => {
@@ -23,7 +31,9 @@ const AppNavigator = () => {
         console.error('Auth check failed:', error);
       } finally {
         setIsLoading(false);
-        SplashScreen.hide();
+        if (SplashScreen) {
+          SplashScreen.hide();
+        }
       }
     };
 
@@ -35,13 +45,23 @@ const AppNavigator = () => {
   }
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <NavigationContainer>
       {isAuthenticated ? (
-        <Stack.Screen name="Main" component={MainNavigator} />
+        <ActivityDetector>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            {isLocked ? (
+              <Stack.Screen name="Lock" component={LockScreen} />
+            ) : (
+              <Stack.Screen name="Main" component={MainNavigator} />
+            )}
+          </Stack.Navigator>
+        </ActivityDetector>
       ) : (
-        <Stack.Screen name="Auth" component={AuthNavigator} />
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Auth" component={AuthNavigator} />
+        </Stack.Navigator>
       )}
-    </Stack.Navigator>
+    </NavigationContainer>
   );
 };
 

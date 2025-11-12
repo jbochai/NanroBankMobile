@@ -1,6 +1,5 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Alert } from 'react-native';
 
 // Import navigators
 import TabNavigator from './TabNavigator';
@@ -15,33 +14,36 @@ import DataScreen from '../screens/bills/DataScreen';
 import TransactionDetailScreen from '../screens/transactions/TransactionDetailScreen';
 import SettingsScreen from '../screens/profile/SettingsScreen';
 
+// Import new screens
+import AllServicesScreen from '../screens/services/AllServicesScreen';
+import BillPaymentDetailScreen from '../screens/bills/BillPaymentDetailScreen';
+import LoansScreen from '../screens/loans/LoansScreen';
+import PersonalInfoScreen from '../screens/profile/PersonalInfoScreen';
+import SecuritySettingsScreen from '../screens/profile/SecuritySettingsScreen';
+import ChangePasswordScreen from '../screens/profile/ChangePasswordScreen';
+import ChangePinScreen from '../screens/profile/ChangePinScreen';
+import TransactionLimitsScreen from '../screens/profile/TransactionLimitsScreen';
+import NotificationSettingsScreen from '../screens/profile/NotificationSettingsScreen';
+import LinkedAccountsScreen from '../screens/profile/LinkedAccountsScreen';
+import NotificationsScreen from '../screens/notifications/NotificationsScreen';
+import QRScannerScreen from '../screens/qr/QRScannerScreen';
+import InvestmentsScreen from '../screens/investments/InvestmentsScreen';
+import SavingsScreen from '../screens/savings/SavingsScreen';
+import ReferFriendScreen from '../screens/referral/ReferFriendScreen';
+import AccountStatementScreen from '../screens/statements/AccountStatementScreen';
+import StatementsScreen from '../screens/statements/StatementsScreen';
+import RewardsScreen from '../screens/rewards/RewardsScreen';
+import SupportScreen from '../screens/support/SupportScreen';
+import AboutScreen from '../screens/about/AboutScreen';
+import RequestCardScreen from '../screens/cards/RequestCardScreen';
+import AnnouncementDetailScreen from '../screens/announcements/AnnouncementDetailScreen';
+import TransferSuccessScreen  from '../screens/transfer/TransferSuccessScreen';
+
 // Import placeholder component
 import PlaceholderScreen from '../components/common/PlaceholderScreen';
 
 // Create placeholder screens with custom titles
 const ServicesScreen = () => <PlaceholderScreen title="Services" />;
-const NotificationsScreen = () => <PlaceholderScreen title="Notifications" />;
-const QRScannerScreen = () => <PlaceholderScreen title="QR Scanner" />;
-const InvestmentsScreen = () => <PlaceholderScreen title="Investments" />;
-const SavingsScreen = () => <PlaceholderScreen title="Savings" />;
-const PersonalInfoScreen = () => <PlaceholderScreen title="Personal Info" />;
-const SecuritySettingsScreen = () => <PlaceholderScreen title="Security Settings" />;
-const ChangePasswordScreen = () => <PlaceholderScreen title="Change Password" />;
-const ChangePinScreen = () => <PlaceholderScreen title="Change PIN" />;
-const ReferFriendScreen = () => <PlaceholderScreen title="Refer a Friend" />;
-const AccountStatementScreen = () => <PlaceholderScreen title="Account Statement" />;
-const StatementsScreen = () => <PlaceholderScreen title="Statements" />;
-const RewardsScreen = () => <PlaceholderScreen title="Rewards" />;
-const LinkedAccountsScreen = () => <PlaceholderScreen title="Linked Accounts" />;
-const TransactionLimitsScreen = () => <PlaceholderScreen title="Transaction Limits" />;
-const NotificationSettingsScreen = () => <PlaceholderScreen title="Notification Settings" />;
-const SupportScreen = () => <PlaceholderScreen title="Support" />;
-const AboutScreen = () => <PlaceholderScreen title="About" />;
-const RequestCardScreen = () => <PlaceholderScreen title="Request Card" />;
-const AnnouncementDetailScreen = () => <PlaceholderScreen title="Announcement" />;
-const AllServicesScreen = () => <PlaceholderScreen title="All Services" />;
-const BillPaymentDetailScreen = () => <PlaceholderScreen title="Bill Payment" />;
-const LoansScreen = () => <PlaceholderScreen title="Loans" />;
 
 const Stack = createStackNavigator();
 
@@ -67,40 +69,49 @@ const MainNavigator = () => {
       }}>
       <Stack.Screen name="HomeTabs" component={TabNavigator} />
       
-      {/* Existing Screens */}
+      {/* Transfer & Payment Screens */}
       <Stack.Screen name="Transfer" component={TransferScreen} />
       <Stack.Screen name="TransferConfirm" component={TransferConfirmScreen} />
       <Stack.Screen name="Beneficiaries" component={BeneficiariesScreen} />
       <Stack.Screen name="BillPayment" component={BillPaymentScreen} />
+      <Stack.Screen name="BillPaymentDetail" component={BillPaymentDetailScreen} />
       <Stack.Screen name="Airtime" component={AirtimeScreen} />
       <Stack.Screen name="Data" component={DataScreen} />
-      <Stack.Screen name="TransactionDetail" component={TransactionDetailScreen} />
-      <Stack.Screen name="Settings" component={SettingsScreen} />
       
-      {/* Placeholder Screens */}
-      <Stack.Screen name="Services" component={ServicesScreen} />
-      <Stack.Screen name="Notifications" component={NotificationsScreen} />
-      <Stack.Screen name="QRScanner" component={QRScannerScreen} />
-      <Stack.Screen name="Investments" component={InvestmentsScreen} />
-      <Stack.Screen name="Savings" component={SavingsScreen} />
+      {/* Transaction Screens */}
+      <Stack.Screen name="TransactionDetail" component={TransactionDetailScreen} />
+      
+      {/* Profile & Settings Screens */}
+      <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
       <Stack.Screen name="SecuritySettings" component={SecuritySettingsScreen} />
       <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
       <Stack.Screen name="ChangePin" component={ChangePinScreen} />
+      <Stack.Screen name="TransactionLimits" component={TransactionLimitsScreen} />
+      <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+      <Stack.Screen name="LinkedAccounts" component={LinkedAccountsScreen} />
+      
+      {/* Service Screens */}
+      <Stack.Screen name="AllServices" component={AllServicesScreen} />
+      <Stack.Screen name="Services" component={ServicesScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="QRScanner" component={QRScannerScreen} />
+      
+      {/* Financial Screens */}
+      <Stack.Screen name="Investments" component={InvestmentsScreen} />
+      <Stack.Screen name="Savings" component={SavingsScreen} />
+      <Stack.Screen name="Loans" component={LoansScreen} />
+      <Stack.Screen name="Rewards" component={RewardsScreen} />
+      
+      {/* Other Screens */}
       <Stack.Screen name="ReferFriend" component={ReferFriendScreen} />
       <Stack.Screen name="AccountStatement" component={AccountStatementScreen} />
       <Stack.Screen name="Statements" component={StatementsScreen} />
-      <Stack.Screen name="Rewards" component={RewardsScreen} />
-      <Stack.Screen name="LinkedAccounts" component={LinkedAccountsScreen} />
-      <Stack.Screen name="TransactionLimits" component={TransactionLimitsScreen} />
-      <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
       <Stack.Screen name="Support" component={SupportScreen} />
       <Stack.Screen name="About" component={AboutScreen} />
       <Stack.Screen name="RequestCard" component={RequestCardScreen} />
       <Stack.Screen name="AnnouncementDetail" component={AnnouncementDetailScreen} />
-      <Stack.Screen name="AllServices" component={AllServicesScreen} />
-      <Stack.Screen name="BillPaymentDetail" component={BillPaymentDetailScreen} />
-      <Stack.Screen name="Loans" component={LoansScreen} />
+      <Stack.Screen name="TransferSuccess"   component={TransferSuccessScreen}  options={{ headerShown: false }}/>
     </Stack.Navigator>
   );
 };

@@ -58,6 +58,7 @@ const DashboardScreen = () => {
         dispatch(fetchRecentTransactions({ limit: 5 })).unwrap(),
       ]);
     } catch (error) {
+      console.log('Dashboard data load error:', error);
       Toast.show({
         type: 'error',
         text1: 'Error',
@@ -376,14 +377,36 @@ const DashboardScreen = () => {
   );
 
   const renderTransaction = ({ item }) => {
-    const isCredit = item.type === 'credit';
+    // Determine if transaction is credit based on type or amount
+    const isCredit = item.type === 'credit' || 
+                     item.type === 'deposit' || 
+                     (item.metadata && item.metadata.transfer_type === 'intra_bank_credit');
+    
     const getTransactionIcon = () => {
-      switch (item.category) {
+      // Use the type field to determine icon
+      switch (item.type) {
         case 'transfer': return 'swap-horiz';
         case 'airtime': return 'phone-android';
-        case 'bills': return 'receipt';
+        case 'bill_payment': return 'receipt';
         case 'deposit': return 'account-balance-wallet';
+        case 'withdrawal': return 'money';
         default: return isCredit ? 'arrow-downward' : 'arrow-upward';
+      }
+    };
+
+    // Get display text for transaction
+    const getTransactionTitle = () => {
+      if (item.description) return item.description;
+      if (item.recipient_account_name) return item.recipient_account_name;
+      
+      // Fallback to type-based title
+      switch (item.type) {
+        case 'transfer': return 'Transfer';
+        case 'airtime': return 'Airtime Purchase';
+        case 'bill_payment': return 'Bill Payment';
+        case 'deposit': return 'Deposit';
+        case 'withdrawal': return 'Withdrawal';
+        default: return item.type || 'Transaction';
       }
     };
 
@@ -404,7 +427,9 @@ const DashboardScreen = () => {
             />
           </View>
           <View style={styles.transactionDetails}>
-            <Text style={styles.transactionTitle}>{item.description}</Text>
+            <Text style={styles.transactionTitle} numberOfLines={1}>
+              {getTransactionTitle()}
+            </Text>
             <Text style={styles.transactionDate}>
               {formatRelativeTime(item.created_at)}
             </Text>
@@ -417,9 +442,11 @@ const DashboardScreen = () => {
               { color: isCredit ? Colors.success : Colors.text },
             ]}>
             {isCredit ? '+' : '-'}
-            {formatCurrency(item.amount)}
+            {formatCurrency(Math.abs(parseFloat(item.amount)))}
           </Text>
-          <Text style={styles.transactionStatus}>{item.status}</Text>
+          <Text style={styles.transactionStatus}>
+            {item.status || 'completed'}
+          </Text>
         </View>
       </TouchableOpacity>
     );
@@ -430,7 +457,7 @@ const DashboardScreen = () => {
       <FlatList
         data={recentTransactions}
         renderItem={renderTransaction}
-        keyExtractor={(item) => item.reference || item.id}
+        keyExtractor={(item) => item.reference || item.id?.toString()}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={
           <View style={styles.emptyState}>

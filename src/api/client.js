@@ -2,17 +2,29 @@ import axios from 'axios';
 import SecureStorage from '../utils/storage';
 import NetInfo from '@react-native-community/netinfo';
 import Toast from 'react-native-toast-message';
-import { API_BASE_URL, API_TIMEOUT } from '@env';
+
+// Hardcoded for now to avoid env issues
+const BASE_API_URL = 'https://nanroinventory.pncitservdesk.com/nanrobankapi/api/v1';
+const BASE_URL = 'https://nanroinventory.pncitservdesk.com/nanrobankapi';
+export const STORAGE_BASE_URL = `${BASE_URL}/storage/app/public`;
+
+console.log('=== API Client Configuration ===');
+console.log('BASE_API_URL:', BASE_API_URL);
+console.log('BASE_URL:', BASE_URL);
+console.log('STORAGE_BASE_URL:', STORAGE_BASE_URL);
+console.log('===============================');
 
 // Create axios instance
-const apiClient = axios.create({
-  baseURL: API_BASE_URL || 'http://localhost:8000/api/v1',
-  timeout: parseInt(API_TIMEOUT) || 30000,
+const api = axios.create({
+  baseURL: BASE_API_URL,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
 });
+
+console.log('API client created:', !!api);
 
 // Token management
 let isRefreshing = false;
@@ -36,7 +48,7 @@ const refreshAuthToken = async () => {
     }
 
     const response = await axios.post(
-      `${API_BASE_URL}/auth/refresh`,
+      `${BASE_API_URL}/auth/refresh`,
       {},
       {
         headers: {
@@ -60,10 +72,37 @@ const refreshAuthToken = async () => {
   }
 };
 
+// Helper function to get full image URL
+export const getImageUrl = (path) => {
+  if (!path) {
+    console.log('getImageUrl - No path provided');
+    return null;
+  }
+  
+  // If already a full URL, return as is
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    console.log('getImageUrl - Already full URL:', path);
+    return path;
+  }
+  
+  // Remove leading slash if present
+  const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+  
+  // Construct full URL
+  const fullUrl = `${STORAGE_BASE_URL}/${cleanPath}`;
+  
+  console.log('getImageUrl - Input:', path);
+  console.log('getImageUrl - Output:', fullUrl);
+  
+  return fullUrl;
+};
+
 // Setup interceptors
 export const setupAxiosInterceptors = (store) => {
+  console.log('Setting up axios interceptors...');
+  
   // Request interceptor
-  apiClient.interceptors.request.use(
+  api.interceptors.request.use(
     async (config) => {
       // Check network connectivity
       const netInfo = await NetInfo.fetch();
@@ -71,10 +110,11 @@ export const setupAxiosInterceptors = (store) => {
         return Promise.reject(new Error('No internet connection'));
       }
 
-      // Skip token for login/register endpoints
+      // Skip token for login/register/biometric endpoints
       const isAuthEndpoint = 
         config.url?.includes('/auth/login') || 
-        config.url?.includes('/auth/register');
+        config.url?.includes('/auth/register') ||
+        (config.url?.includes('/auth/login/biometric') && config.method === 'post' && !config.headers.Authorization);
 
       if (!isAuthEndpoint) {
         // Add auth token to headers for other endpoints
@@ -105,7 +145,7 @@ export const setupAxiosInterceptors = (store) => {
   );
 
   // Response interceptor
-  apiClient.interceptors.response.use(
+  api.interceptors.response.use(
     (response) => {
       // Handle successful response
       return response;
@@ -136,7 +176,8 @@ export const setupAxiosInterceptors = (store) => {
       // Skip token refresh for auth endpoints
       const isAuthEndpoint = 
         originalRequest.url?.includes('/auth/login') || 
-        originalRequest.url?.includes('/auth/register');
+        originalRequest.url?.includes('/auth/register') ||
+        originalRequest.url?.includes('/auth/login/biometric');
 
       // Handle 401 Unauthorized (token expired)
       if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
@@ -151,7 +192,7 @@ export const setupAxiosInterceptors = (store) => {
             
             // Retry original request with new token
             originalRequest.headers.Authorization = `Bearer ${newToken}`;
-            return apiClient(originalRequest);
+            return api(originalRequest);
           } catch (refreshError) {
             isRefreshing = false;
             // Redirect to login
@@ -169,7 +210,7 @@ export const setupAxiosInterceptors = (store) => {
         return new Promise((resolve, reject) => {
           subscribeTokenRefresh((token) => {
             originalRequest.headers.Authorization = `Bearer ${token}`;
-            resolve(apiClient(originalRequest));
+            resolve(api(originalRequest));
           });
         });
       }
@@ -217,6 +258,8 @@ export const setupAxiosInterceptors = (store) => {
       return Promise.reject(error);
     }
   );
+  
+  console.log('Axios interceptors setup complete');
 };
 
 // API response handler
@@ -260,4 +303,8 @@ export const handleApiError = (error) => {
   }
 };
 
-export default apiClient;
+// Export base URL for use in other files
+export const BASE_URL_EXPORT = BASE_URL;
+
+console.log('Exporting API client...');
+export default api;

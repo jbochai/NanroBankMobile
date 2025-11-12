@@ -1,8 +1,8 @@
 import apiClient, { handleApiResponse, handleApiError } from './client';
-import { encryptTransactionPin } from '../utils/encryption';
 
 /**
  * Transfer API Service
+ * NOTE: PIN encryption is handled by the backend, not frontend
  */
 class TransferService {
   /**
@@ -10,15 +10,13 @@ class TransferService {
    */
   async intraBankTransfer(transferData) {
     try {
-      // Encrypt transaction PIN
-      const encryptedPin = await encryptTransactionPin(transferData.transaction_pin);
+      // Send PIN as-is, backend will handle encryption and verification
+       console.log('ABout to post a transaction to Backend for :', transferData );
 
-      const payload = {
-        ...transferData,
-        transaction_pin: encryptedPin,
-      };
+      const response = await apiClient.post('/transfer/intra-bank', transferData);
 
-      const response = await apiClient.post('/transfer/intra-bank', payload);
+             console.log('Back from Backend Server for :', response );
+
       const data = handleApiResponse(response);
 
       return {
@@ -35,15 +33,8 @@ class TransferService {
    */
   async interBankTransfer(transferData) {
     try {
-      // Encrypt transaction PIN
-      const encryptedPin = await encryptTransactionPin(transferData.transaction_pin);
-
-      const payload = {
-        ...transferData,
-        transaction_pin: encryptedPin,
-      };
-
-      const response = await apiClient.post('/transfer/inter-bank', payload);
+      // Send PIN as-is, backend will handle encryption and verification
+      const response = await apiClient.post('/transfer/inter-bank', transferData);
       const data = handleApiResponse(response);
 
       return {
@@ -79,13 +70,26 @@ class TransferService {
     try {
       const params = new URLSearchParams(filters).toString();
       const response = await apiClient.get(`/transfer/beneficiaries${params ? '?' + params : ''}`);
-      const data = handleApiResponse(response);
+      const responseData = handleApiResponse(response);
+      
+      // Handle nested response structure if needed
+      const beneficiaries = responseData?.beneficiaries || responseData || [];
 
       return {
         success: true,
-        data,
+        data: beneficiaries,
       };
     } catch (error) {
+      console.error('Failed to fetch beneficiaries:', error);
+      
+      // If endpoint doesn't exist or returns 404, return empty array
+      if (error?.response?.status === 404 || error?.status === 404) {
+        return {
+          success: true,
+          data: [],
+        };
+      }
+      
       return handleApiError(error);
     }
   }
@@ -129,10 +133,9 @@ class TransferService {
    */
   async deleteBeneficiary(beneficiaryId, pin) {
     try {
-      const encryptedPin = await encryptTransactionPin(pin);
-
+      // Send PIN as-is for verification
       const response = await apiClient.delete(`/transfer/beneficiaries/${beneficiaryId}`, {
-        data: { transaction_pin: encryptedPin }
+        data: { transaction_pin: pin }
       });
       const data = handleApiResponse(response);
 
@@ -150,14 +153,30 @@ class TransferService {
    */
   async getBankList() {
     try {
-      const response = await apiClient.get('/transfer/banks');
-      const data = handleApiResponse(response);
+      const response = await apiClient.get('/transfer/fetch-bank-list');
+      const responseData = handleApiResponse(response);
+      
+      // Extract banks array from nested structure
+      // Response format: { success: true, data: { banks: [...], total: 60 } }
+      const banks = responseData?.banks || responseData || [];
 
       return {
         success: true,
-        data,
+        data: banks,
       };
     } catch (error) {
+      console.error('Failed to fetch bank list:', error);
+      
+      // If endpoint doesn't exist or returns 404
+      if (error?.response?.status === 404 || error?.status === 404) {
+        console.warn('Bank list endpoint returned 404');
+        return {
+          success: false,
+          message: 'Bank list endpoint not found',
+          statusCode: 404,
+        };
+      }
+      
       return handleApiError(error);
     }
   }
@@ -184,14 +203,8 @@ class TransferService {
    */
   async scheduleTransfer(transferData) {
     try {
-      const encryptedPin = await encryptTransactionPin(transferData.transaction_pin);
-
-      const payload = {
-        ...transferData,
-        transaction_pin: encryptedPin,
-      };
-
-      const response = await apiClient.post('/transfer/schedule', payload);
+      // Send PIN as-is
+      const response = await apiClient.post('/transfer/schedule', transferData);
       const data = handleApiResponse(response);
 
       return {
@@ -225,10 +238,9 @@ class TransferService {
    */
   async cancelScheduledTransfer(transferId, pin) {
     try {
-      const encryptedPin = await encryptTransactionPin(pin);
-
+      // Send PIN as-is
       const response = await apiClient.delete(`/transfer/scheduled/${transferId}`, {
-        data: { transaction_pin: encryptedPin }
+        data: { transaction_pin: pin }
       });
       const data = handleApiResponse(response);
 
@@ -246,11 +258,10 @@ class TransferService {
    */
   async bulkTransfer(transfers, pin) {
     try {
-      const encryptedPin = await encryptTransactionPin(pin);
-
+      // Send PIN as-is
       const payload = {
         transfers,
-        transaction_pin: encryptedPin,
+        transaction_pin: pin,
       };
 
       const response = await apiClient.post('/transfer/bulk', payload);
@@ -361,7 +372,8 @@ class TransferService {
       const payload = { action };
       
       if (action === 'approve' && pin) {
-        payload.transaction_pin = await encryptTransactionPin(pin);
+        // Send PIN as-is
+        payload.transaction_pin = pin;
       }
 
       const response = await apiClient.post(`/transfer/money-requests/${requestId}/respond`, payload);
