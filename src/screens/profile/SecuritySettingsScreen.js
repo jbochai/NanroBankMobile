@@ -33,8 +33,9 @@ const SecuritySettingsScreen = () => {
   const user = useSelector(selectUser);
   const biometricEnabled = useSelector(selectBiometricEnabled);
 
+  // Initialize biometric from Redux state immediately to prevent flashing
   const [settings, setSettings] = useState({
-    biometric: false,
+    biometric: biometricEnabled, // ← Start with Redux state
     twoFactor: false,
     loginNotifications: true,
     transactionAlerts: true,
@@ -50,13 +51,25 @@ const SecuritySettingsScreen = () => {
 
   const rnBiometrics = new ReactNativeBiometrics();
 
+  // Initial load
   useEffect(() => {
     checkBiometricAvailability();
     loadSettings();
   }, []);
 
+  // Reload when screen comes back into focus
   useEffect(() => {
-    // Sync with Redux state
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('SecuritySettings - Screen focused, reloading...');
+      loadSettings();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  // Sync with Redux state (important for when Redux updates)
+  useEffect(() => {
+    console.log('SecuritySettings - Redux biometricEnabled changed:', biometricEnabled);
     setSettings(prev => ({
       ...prev,
       biometric: biometricEnabled,
@@ -69,30 +82,48 @@ const SecuritySettingsScreen = () => {
       setBiometricAvailable(available);
       setBiometricType(biometryType || 'Biometric');
       
-      console.log('Biometric available:', available, 'Type:', biometryType);
+      console.log('SecuritySettings - Biometric available:', available, 'Type:', biometryType);
     } catch (error) {
-      console.error('Biometric check error:', error);
+      console.error('SecuritySettings - Biometric check error:', error);
       setBiometricAvailable(false);
     }
   };
 
   const loadSettings = async () => {
     try {
-      const isBiometricEnabled = await AuthService.isBiometricEnabled();
+      console.log('SecuritySettings - Loading settings...');
+      
+      // Don't require auth token for checking if biometric is enabled
+      const isBiometricEnabled = await AuthService.isBiometricEnabled(false);
+      
+      console.log('SecuritySettings - isBiometricEnabled from storage:', isBiometricEnabled);
+      console.log('SecuritySettings - biometricEnabled from Redux:', biometricEnabled);
+      
+      // Update local state
       setSettings(prev => ({
         ...prev,
         biometric: isBiometricEnabled,
       }));
+      
+      // Sync with Redux if different
+      if (isBiometricEnabled !== biometricEnabled) {
+        console.log('SecuritySettings - Syncing Redux with storage:', isBiometricEnabled);
+        dispatch(setBiometricEnabled(isBiometricEnabled));
+      }
     } catch (error) {
-      console.error('Error loading settings:', error);
+      console.error('SecuritySettings - Error loading settings:', error);
     }
   };
 
   const handleEnableBiometric = async (transactionPin) => {
     try {
+      console.log('SecuritySettings - Enabling biometric...');
+      
       const setupResult = await AuthService.setupBiometric(transactionPin);
       
       if (setupResult.success) {
+        console.log('SecuritySettings - Biometric enabled successfully');
+        
         // Update Redux state
         dispatch(setBiometricEnabled(true));
         
@@ -108,6 +139,8 @@ const SecuritySettingsScreen = () => {
           text2: `${biometricType} login has been enabled`,
         });
       } else {
+        console.error('SecuritySettings - Enable failed:', setupResult.message);
+        
         Toast.show({
           type: 'error',
           text1: 'Setup Failed',
@@ -115,7 +148,7 @@ const SecuritySettingsScreen = () => {
         });
       }
     } catch (error) {
-      console.error('Biometric setup error:', error);
+      console.error('SecuritySettings - Biometric setup error:', error);
       Toast.show({
         type: 'error',
         text1: 'Setup Failed',
@@ -128,9 +161,13 @@ const SecuritySettingsScreen = () => {
 
   const handleDisableBiometric = async (transactionPin) => {
     try {
+      console.log('SecuritySettings - Disabling biometric...');
+      
       const result = await AuthService.disableBiometric(transactionPin);
       
       if (result.success) {
+        console.log('SecuritySettings - Biometric disabled successfully');
+        
         // Update Redux state
         dispatch(setBiometricEnabled(false));
         
@@ -146,6 +183,8 @@ const SecuritySettingsScreen = () => {
           text2: 'Biometric login has been disabled',
         });
       } else {
+        console.error('SecuritySettings - Disable failed:', result.message);
+        
         Toast.show({
           type: 'error',
           text1: 'Failed',
@@ -153,7 +192,7 @@ const SecuritySettingsScreen = () => {
         });
       }
     } catch (error) {
-      console.error('Biometric disable error:', error);
+      console.error('SecuritySettings - Biometric disable error:', error);
       Toast.show({
         type: 'error',
         text1: 'Failed',
@@ -254,7 +293,7 @@ const SecuritySettingsScreen = () => {
         }
       }
     } catch (error) {
-      console.error('Biometric toggle error:', error);
+      console.error('SecuritySettings - Biometric toggle error:', error);
       Toast.show({
         type: 'error',
         text1: 'Error',

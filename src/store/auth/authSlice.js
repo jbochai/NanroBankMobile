@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import AuthService from '../../api/auth';
 import EncryptedStorage from 'react-native-encrypted-storage';
+import ReactNativeBiometrics from 'react-native-biometrics';
 
 // Initial state
 const initialState = {
@@ -39,13 +40,15 @@ export const biometricLogin = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await AuthService.biometricLogin();
+      
       if (response.success) {
         return response.data;
       } else {
-        return rejectWithValue(response);
+        return rejectWithValue(response.message);
       }
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Biometric login thunk error:', error);
+      return rejectWithValue(error.message || 'Biometric authentication failed');
     }
   }
 );
@@ -68,16 +71,24 @@ export const register = createAsyncThunk(
 
 export const logout = createAsyncThunk(
   'auth/logout',
-  async (_, { rejectWithValue }) => {
+  async (_, { dispatch }) => {
     try {
-      const response = await AuthService.logout();
-      if (response.success) {
-        return response.data;
-      } else {
-        return rejectWithValue(response);
-      }
+      console.log('=== Logout Thunk ===');
+      
+      // Call logout API
+      await AuthService.logout();
+      
+      // Clear auth data but preserve biometric settings
+      await AuthService.clearAuthData(true); // true = preserve biometric
+      
+      console.log('Logout thunk completed');
+      
+      return true;
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Logout thunk error:', error);
+      // Even if API call fails, clear local data
+      await AuthService.clearAuthData(true);
+      return true;
     }
   }
 );
@@ -114,55 +125,44 @@ export const setupBiometric = createAsyncThunk(
   }
 );
 
-// export const checkAuthStatus = createAsyncThunk(
-//   'auth/checkStatus',
-//   async (_, { rejectWithValue }) => {
-//     try {
-//       const isAuth = await AuthService.isAuthenticated();
-//       if (isAuth) {
-//         const userData = await EncryptedStorage.getItem('user_data');
-//         const biometricEnabled = await AuthService.isBiometricEnabled();
-//         return {
-//           user: userData ? JSON.parse(userData) : null,
-//           biometricEnabled,
-//         };
-//       }
-//       return null;
-//     } catch (error) {
-//       return rejectWithValue(error.message);
-//     }
-//   }
-// );
 export const checkAuthStatus = createAsyncThunk(
   'auth/checkStatus',
   async (_, { rejectWithValue }) => {
     try {
       const isAuth = await AuthService.isAuthenticated();
+      
+      // Always check biometric status regardless of auth state
+      const biometricEnabled = await AuthService.isBiometricEnabled(false);
+      
       if (isAuth) {
         const userData = await EncryptedStorage.getItem('user_data');
         const user = userData ? JSON.parse(userData) : null;
         
-        // Sync biometric enabled from user data
-        const biometricEnabled = user?.biometric_enabled || false;
-        
-        // Also check local storage
-        const localBiometricEnabled = await AuthService.isBiometricEnabled();
-        
-        console.log('CheckAuthStatus - User biometric_enabled:', user?.biometric_enabled);
-        console.log('CheckAuthStatus - Local biometric enabled:', localBiometricEnabled);
+        console.log('CheckAuthStatus - Authenticated:');
+        console.log('  - User biometric_enabled:', user?.biometric_enabled);
+        console.log('  - Storage biometric enabled:', biometricEnabled);
         
         return {
           user: user,
-          biometricEnabled: biometricEnabled || localBiometricEnabled,
+          biometricEnabled: biometricEnabled,
+        };
+      } else {
+        // User not authenticated, but preserve biometric setting
+        console.log('CheckAuthStatus - Not authenticated:');
+        console.log('  - Biometric enabled:', biometricEnabled);
+        
+        return {
+          user: null,
+          biometricEnabled: biometricEnabled,
         };
       }
-      return null;
     } catch (error) {
       return rejectWithValue(error.message);
     }
   }
 );
-// New: Unlock screen after idle timeout
+
+// Unlock screen after idle timeout
 export const unlockScreen = createAsyncThunk(
   'auth/unlockScreen',
   async (password, { rejectWithValue, getState }) => {
@@ -180,15 +180,6 @@ export const unlockScreen = createAsyncThunk(
       if (storedPassword === password) {
         return { success: true };
       }
-      
-      // Optionally verify with backend
-      // const response = await AuthService.verifyPassword({
-      //   email: user.email,
-      //   password: password,
-      // });
-      // if (response.success) {
-      //   return { success: true };
-      // }
       
       return rejectWithValue('Invalid password');
     } catch (error) {
@@ -224,6 +215,7 @@ const authSlice = createSlice({
       state.user = null;
       state.isAuthenticated = false;
       state.sessionTimeout = null;
+      // Keep biometricEnabled
     },
     lockScreen: (state) => {
       state.isLocked = true;
@@ -234,6 +226,7 @@ const authSlice = createSlice({
     },
     setBiometricEnabled: (state, action) => {
       state.biometricEnabled = action.payload;
+      console.log('Redux - setBiometricEnabled:', action.payload);
     },
   },
   extraReducers: (builder) => {
@@ -252,6 +245,11 @@ const authSlice = createSlice({
         state.isAccountLocked = false;
         state.lockoutEndTime = null;
         state.sessionTimeout = Date.now() + 5 * 60 * 1000; // 5 minutes
+        
+        // Update biometricEnabled from user data if available
+        if (action.payload.user?.biometric_enabled !== undefined) {
+          state.biometricEnabled = action.payload.user.biometric_enabled;
+        }
       })
       .addCase(login.rejected, (state, action) => {
         state.isLoading = false;
@@ -275,6 +273,9 @@ const authSlice = createSlice({
         state.isAuthenticated = true;
         state.isLocked = false;
         state.sessionTimeout = Date.now() + 5 * 60 * 1000;
+        
+        // Biometric is obviously enabled if login succeeded
+        state.biometricEnabled = true;
       })
       .addCase(biometricLogin.rejected, (state, action) => {
         state.isLoading = false;
@@ -305,20 +306,28 @@ const authSlice = createSlice({
         state.isLoading = true;
       })
       .addCase(logout.fulfilled, (state) => {
+        console.log('Redux - logout.fulfilled - preserving biometricEnabled:', state.biometricEnabled);
+        
         state.isLoading = false;
         state.user = null;
         state.isAuthenticated = false;
-        state.biometricEnabled = false;
+        // DON'T clear biometricEnabled - it's preserved in storage!
+        // state.biometricEnabled stays as is
         state.sessionTimeout = null;
         state.isLocked = false;
         state.error = null;
+        
+        console.log('Redux - After logout - biometricEnabled:', state.biometricEnabled);
       })
       .addCase(logout.rejected, (state) => {
+        console.log('Redux - logout.rejected - preserving biometricEnabled:', state.biometricEnabled);
+        
         // Even if logout fails, clear local state
         state.isLoading = false;
         state.user = null;
         state.isAuthenticated = false;
-        state.biometricEnabled = false;
+        // DON'T clear biometricEnabled
+        // state.biometricEnabled stays as is
         state.sessionTimeout = null;
         state.isLocked = false;
       });
@@ -331,6 +340,11 @@ const authSlice = createSlice({
       .addCase(getMe.fulfilled, (state, action) => {
         state.isLoading = false;
         state.user = action.payload;
+        
+        // Sync biometric status from user data
+        if (action.payload?.biometric_enabled !== undefined) {
+          state.biometricEnabled = action.payload.biometric_enabled;
+        }
       })
       .addCase(getMe.rejected, (state, action) => {
         state.isLoading = false;
@@ -341,9 +355,11 @@ const authSlice = createSlice({
     builder
       .addCase(setupBiometric.fulfilled, (state) => {
         state.biometricEnabled = true;
+        console.log('Redux - setupBiometric.fulfilled - biometricEnabled: true');
       })
       .addCase(setupBiometric.rejected, (state) => {
-        state.biometricEnabled = false;
+        // Don't change state on rejection
+        console.log('Redux - setupBiometric.rejected');
       });
 
     // Check Auth Status
@@ -355,13 +371,20 @@ const authSlice = createSlice({
         state.isLoading = false;
         if (action.payload) {
           state.user = action.payload.user;
-          state.isAuthenticated = true;
+          state.isAuthenticated = !!action.payload.user;
+          // ALWAYS update biometricEnabled from storage (even if no user)
           state.biometricEnabled = action.payload.biometricEnabled;
+          
+          console.log('Redux - checkAuthStatus.fulfilled:');
+          console.log('  - isAuthenticated:', state.isAuthenticated);
+          console.log('  - biometricEnabled:', state.biometricEnabled);
         }
       })
       .addCase(checkAuthStatus.rejected, (state) => {
         state.isLoading = false;
         state.isAuthenticated = false;
+        // DON'T clear biometricEnabled here
+        console.log('Redux - checkAuthStatus.rejected - biometricEnabled preserved');
       });
 
     // Unlock Screen

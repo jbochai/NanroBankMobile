@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import TransactionService from '../../api/transaction';
+import api from '../../api/client';
 
 // Initial state
 const initialState = {
@@ -41,17 +42,20 @@ export const fetchTransactions = createAsyncThunk(
 );
 
 export const fetchRecentTransactions = createAsyncThunk(
-  'transaction/fetchRecent',
-  async (params = { limit: 5 }, { rejectWithValue }) => {
+  'transactions/fetchRecent',
+  async ({ limit = 5 }, { rejectWithValue }) => {
     try {
-      const response = await TransactionService.getRecentTransactions(params);
-      if (response.success) {
-        return response.data;
-      } else {
-        return rejectWithValue(response);
-      }
+      // Use main transactions endpoint with limit
+      const response = await api.get('/transactions', {
+        params: { 
+          page: 1,
+          limit: limit,
+        },
+      });
+      //console.log('Recent Transactions API Response:', response.data);
+      return response.data;
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error.response?.data || error.message);
     }
   }
 );
@@ -180,10 +184,22 @@ const transactionSlice = createSlice({
     builder
       .addCase(fetchRecentTransactions.pending, (state) => {
         state.isLoading = true;
+        state.error = null;
       })
       .addCase(fetchRecentTransactions.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.recentTransactions = action.payload || [];
+        
+        // Extract transactions from Laravel paginated response
+        // API returns: { success: true, data: { data: [...transactions], total: 5, ... } }
+        const responseData = action.payload.data || action.payload;
+        const transactions = responseData.data || responseData || [];
+        
+        // Only store first 5 transactions for dashboard
+        const recentTransactions = transactions.slice(0, 5);
+        
+        //console.log('Extracted transactions:', transactions.length, 'items');
+        //console.log('Storing recent transactions:', recentTransactions.length, 'items');
+        state.recentTransactions = recentTransactions;
       })
       .addCase(fetchRecentTransactions.rejected, (state, action) => {
         state.isLoading = false;
@@ -256,7 +272,24 @@ export default transactionSlice.reducer;
 
 // Selectors
 export const selectTransactions = (state) => state.transaction.transactions;
-export const selectRecentTransactions = (state) => state.transaction.recentTransactions;
+
+export const selectRecentTransactions = (state) => {
+  const transactions = state.transaction.recentTransactions;
+  
+  // Ensure we always return an array
+  let transactionArray = [];
+  
+  if (Array.isArray(transactions)) {
+    transactionArray = transactions;
+  } else if (transactions?.data && Array.isArray(transactions.data)) {
+    // If it's still a paginated object, extract the data
+    transactionArray = transactions.data;
+  }
+  
+  // Return only first 5 transactions for dashboard
+  return transactionArray.slice(0, 5);
+};
+
 export const selectCurrentTransaction = (state) => state.transaction.currentTransaction;
 export const selectTransactionFilters = (state) => state.transaction.filters;
 export const selectTransactionPagination = (state) => state.transaction.pagination;

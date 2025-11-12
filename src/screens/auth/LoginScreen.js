@@ -119,25 +119,64 @@ const LoginScreen = () => {
     }
   }, [error]);
 
-  const checkBiometricAvailability = async () => {
-    try {
-      const { available, biometryType } = await rnBiometrics.isSensorAvailable();
-      setBiometricAvailable(available);
+
+//   const handleBiometricLogin = async () => {
+//   if (!biometricAvailable) {
+//     Toast.show({
+//       type: 'info',
+//       text1: 'Biometric Not Available',
+//       text2: 'Please use password to login',
+//     });
+//     return;
+//   }
+
+//   try {
+//     // This will trigger the native biometric prompt
+//     const result = await dispatch(biometricLogin()).unwrap();
+    
+//     if (result) {
+//       Toast.show({
+//         type: 'success',
+//         text1: 'Welcome Back!',
+//         text2: `Hello, ${result.user.first_name}`,
+//       });
+//     }
+//   } catch (error) {
+//     console.error('Biometric login error:', error);
+    
+//     // Show error only if it's not a user cancellation
+//     if (error !== 'User cancellation' && 
+//         error !== 'Biometric authentication failed') {
+//       Toast.show({
+//         type: 'error',
+//         text1: 'Biometric Login Failed',
+//         text2: error,
+//         visibilityTime: 3000,
+//       });
+//     }
+//   }
+// };
+
+
+  // const checkBiometricAvailability = async () => {
+  //   try {
+  //     const { available, biometryType } = await rnBiometrics.isSensorAvailable();
+  //     setBiometricAvailable(available);
       
-      console.log('Biometric available:', available, 'Type:', biometryType);
+  //     console.log('Biometric available:', available, 'Type:', biometryType);
       
-      // Check if biometric login is set up
-      const biometricEnabled = await AuthService.isBiometricEnabled();
-      console.log('Biometric enabled:', biometricEnabled);
+  //     // Check if biometric login is set up
+  //     const biometricEnabled = await AuthService.isBiometricEnabled();
+  //     console.log('Biometric enabled:', biometricEnabled);
       
-      if (available && biometricEnabled) {
-        // Auto prompt for biometric login
-        setTimeout(() => handleBiometricLogin(), 500);
-      }
-    } catch (error) {
-      console.log('Biometric check error:', error);
-    }
-  };
+  //     if (available && biometricEnabled) {
+  //       // Auto prompt for biometric login
+  //       setTimeout(() => handleBiometricLogin(), 500);
+  //     }
+  //   } catch (error) {
+  //     console.log('Biometric check error:', error);
+  //   }
+  // };
 
   // const onSubmit = async (data) => {
   //   if (isAccountLocked && lockoutTimeRemaining > 0) {
@@ -169,26 +208,122 @@ const LoginScreen = () => {
   //   }
   // };
 
-  const onSubmit = async (data) => {
-  if (isAccountLocked && lockoutTimeRemaining > 0) {
-    const minutes = Math.ceil(lockoutTimeRemaining / 60000);
-    Alert.alert(
-      'Account Locked',
-      `Too many failed login attempts. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`,
-    );
+//   const onSubmit = async (data) => {
+//   if (isAccountLocked && lockoutTimeRemaining > 0) {
+//     const minutes = Math.ceil(lockoutTimeRemaining / 60000);
+//     Alert.alert(
+//       'Account Locked',
+//       `Too many failed login attempts. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`,
+//     );
+//     return;
+//   }
+
+//   try {
+//     const result = await dispatch(login(data)).unwrap();
+    
+//     if (result) {
+//       // Store password for unlock screen (encrypted)
+//       await AuthService.storePassword(data.password);
+      
+//       // Refresh biometric availability after login
+//       await checkBiometricAvailability();
+      
+//       Toast.show({
+//         type: 'success',
+//         text1: 'Welcome Back!',
+//         text2: `Hello, ${result.user.first_name}`,
+//       });
+//     }
+//   } catch (error) {
+//     console.error('Login error:', error);
+//   }
+// };
+
+
+// const onSubmit = async (data) => {
+//   if (isAccountLocked && lockoutTimeRemaining > 0) {
+//     const minutes = Math.ceil(lockoutTimeRemaining / 60000);
+//     Alert.alert(
+//       'Account Locked',
+//       `Too many failed login attempts. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`,
+//     );
+//     return;
+//   }
+
+//   try {
+//     const result = await dispatch(login(data)).unwrap();
+    
+//     if (result) {
+//       Toast.show({
+//         type: 'success',
+//         text1: 'Welcome Back!',
+//         text2: `Hello, ${result.user.first_name}`,
+//       });
+
+//       // Check if biometric is available and not yet enabled
+//       if (biometricAvailable) {
+//         const isEnabled = await AuthService.isBiometricEnabled();
+        
+//         if (!isEnabled) {
+//           // Offer to setup biometric after successful login
+//           setTimeout(() => {
+//             Alert.alert(
+//               'Enable Biometric Login?',
+//               'Would you like to enable fingerprint/face recognition for faster login?',
+//               [
+//                 {
+//                   text: 'Not Now',
+//                   style: 'cancel',
+//                 },
+//                 {
+//                   text: 'Enable',
+//                   onPress: async () => {
+//                     const setupResult = await AuthService.enableBiometric(
+//                       data.login,
+//                       data.password
+//                     );
+                    
+//                     if (setupResult.success) {
+//                       Toast.show({
+//                         type: 'success',
+//                         text1: 'Biometric Enabled',
+//                         text2: 'You can now login with your fingerprint',
+//                       });
+//                     } else {
+//                       Toast.show({
+//                         type: 'error',
+//                         text1: 'Setup Failed',
+//                         text2: setupResult.error,
+//                       });
+//                     }
+//                   },
+//                 },
+//               ],
+//             );
+//           }, 1000);
+//         }
+//       }
+//     }
+//   } catch (error) {
+//     console.error('Login error:', error);
+//   }
+// };
+
+
+const handleBiometricLogin = async () => {
+  if (!biometricAvailable) {
+    Toast.show({
+      type: 'info',
+      text1: 'Biometric Not Available',
+      text2: 'Please use password to login',
+    });
     return;
   }
 
   try {
-    const result = await dispatch(login(data)).unwrap();
+    const result = await dispatch(biometricLogin()).unwrap();
     
     if (result) {
-      // Store password for unlock screen (encrypted)
-      await AuthService.storePassword(data.password);
-      
-      // Refresh biometric availability after login
-      await checkBiometricAvailability();
-      
       Toast.show({
         type: 'success',
         text1: 'Welcome Back!',
@@ -196,26 +331,197 @@ const LoginScreen = () => {
       });
     }
   } catch (error) {
+    console.error('Biometric login error:', error);
+    
+    // Show helpful error messages
+    if (error.includes('No active session') || error.includes('Session expired')) {
+      Toast.show({
+        type: 'info',
+        text1: 'Session Expired',
+        text2: 'Please login with password',
+        visibilityTime: 3000,
+      });
+    } else if (error.includes('not enabled')) {
+      Toast.show({
+        type: 'info',
+        text1: 'Biometric Not Enabled',
+        text2: 'Enable it in Security Settings after login',
+        visibilityTime: 3000,
+      });
+    } else if (error !== 'Authentication cancelled') {
+      Toast.show({
+        type: 'error',
+        text1: 'Biometric Login Failed',
+        text2: error,
+        visibilityTime: 3000,
+      });
+    }
+  }
+};
+
+// const checkBiometricAvailability = async () => {
+//   try {
+//     const { available, biometryType } = await rnBiometrics.isSensorAvailable();
+//     setBiometricAvailable(available);
+    
+//     console.log('Biometric available:', available, 'Type:', biometryType);
+    
+//     if (available) {
+//       const biometricEnabled = await AuthService.isBiometricEnabled();
+//       console.log('Biometric enabled:', biometricEnabled);
+      
+//       if (biometricEnabled) {
+//         // Only auto-prompt if user has valid session
+//         // Don't auto-prompt on first load - let user tap button
+//         console.log('Biometric ready to use');
+//       } else {
+//         console.log('Biometric not set up or no valid session');
+//       }
+//     }
+//   } catch (error) {
+//     console.log('Biometric check error:', error);
+//   }
+// };
+
+// const checkBiometricAvailability = async () => {
+//   try {
+//     const { available, biometryType } = await rnBiometrics.isSensorAvailable();
+//     setBiometricAvailable(available);
+    
+//     console.log('Biometric available:', available, 'Type:', biometryType);
+    
+//     if (available) {
+//       const biometricEnabled = await AuthService.isBiometricEnabled();
+//       console.log('Biometric enabled:', biometricEnabled);
+      
+//       // Don't auto-prompt - let user tap button
+//       // Auto-prompt is annoying if user wants to use password
+//     }
+//   } catch (error) {
+//     console.log('Biometric check error:', error);
+//   }
+// };
+
+const checkBiometricAvailability = async () => {
+  try {
+    const { available, biometryType } = await rnBiometrics.isSensorAvailable();
+    setBiometricAvailable(available);
+    
+    console.log('LoginScreen - Biometric available:', available, 'Type:', biometryType);
+    
+    if (available) {
+      // Check if biometric is enabled (from EncryptedStorage directly - no auth token needed)
+      const isEnabled = await EncryptedStorage.getItem('biometric_enabled');
+      const hasSignature = await EncryptedStorage.getItem('biometric_signature');
+      
+      const biometricReady = isEnabled === 'true' && hasSignature !== null;
+      
+      console.log('LoginScreen - Biometric check:');
+      console.log('  - Enabled:', isEnabled === 'true');
+      console.log('  - Has signature:', !!hasSignature);
+      console.log('  - Ready to use:', biometricReady);
+      
+      // Don't auto-prompt - let user tap button
+      // Auto-prompt is annoying if user wants to use password
+    }
+  } catch (error) {
+    console.log('LoginScreen - Biometric check error:', error);
+  }
+};
+
+const onSubmit = async (data) => {
+  try {
+    const result = await dispatch(login(data)).unwrap();
+    
+    if (result) {
+      Toast.show({
+        type: 'success',
+        text1: 'Welcome Back!',
+        text2: `Hello, ${result.user.first_name}`,
+      });
+
+      // Check if user wants biometric
+      const biometricEnabled = await AuthService.isBiometricEnabled();
+      
+      if (biometricEnabled) {
+        // Update stored credentials with latest password
+        await AuthService.storeBiometricCredentials(data.login, data.password);
+        console.log('Biometric credentials updated');
+      } else if (biometricAvailable) {
+        // Offer to enable biometric if not set up
+        setTimeout(() => {
+          Alert.alert(
+            'Enable Biometric Login?',
+            'Login faster with your fingerprint or face',
+            [
+              { text: 'Not Now', style: 'cancel' },
+              {
+                text: 'Enable',
+                onPress: async () => {
+                  const result = await AuthService.enableBiometric(
+                    data.login,
+                    data.password
+                  );
+                  
+                  if (result.success) {
+                    Toast.show({
+                      type: 'success',
+                      text1: 'Biometric Enabled',
+                      text2: 'You can now use fingerprint to login',
+                    });
+                  }
+                },
+              },
+            ],
+          );
+        }, 1000);
+      }
+    }
+  } catch (error) {
     console.error('Login error:', error);
   }
 };
-  const handleBiometricLogin = async () => {
-    try {
-      const result = await dispatch(biometricLogin()).unwrap();
+  // const handleBiometricLogin = async () => {
+  //   try {
+  //     const result = await dispatch(biometricLogin()).unwrap();
       
-      if (result) {
-        Toast.show({
-          type: 'success',
-          text1: 'Welcome Back!',
-          text2: `Hello, ${result.user.first_name}`,
-        });
-      }
-    } catch (error) {
-      console.error('Biometric login error:', error);
-      // Don't show error toast for biometric login failure
-      // User can still use password
-    }
-  };
+  //     if (result) {
+  //       Toast.show({
+  //         type: 'success',
+  //         text1: 'Welcome Back!',
+  //         text2: `Hello, ${result.user.first_name}`,
+  //       });
+  //     }
+  //   } catch (error) {
+  //     console.error('Biometric login error:', error);
+  //     // Don't show error toast for biometric login failure
+  //     // User can still use password
+  //   }
+  // };
+
+//   const checkBiometricAvailability = async () => {
+//   try {
+//     const { available, biometryType } = await rnBiometrics.isSensorAvailable();
+//     setBiometricAvailable(available);
+    
+//     console.log('Biometric available:', available, 'Type:', biometryType);
+    
+//     if (available) {
+//       // Check if biometric login is set up (user has enabled it)
+//       const biometricEnabled = await AuthService.isBiometricEnabled();
+//       console.log('Biometric enabled:', biometricEnabled);
+      
+//       if (biometricEnabled) {
+//         // Don't auto-prompt - let user tap the fingerprint button
+//         // This prevents annoying users who may not want biometric every time
+//         console.log('Biometric ready to use');
+//       }
+//     }
+//   } catch (error) {
+//     console.log('Biometric check error:', error);
+//   }
+// };
+
 
   const formatLockoutTime = () => {
     const minutes = Math.floor(lockoutTimeRemaining / 60000);

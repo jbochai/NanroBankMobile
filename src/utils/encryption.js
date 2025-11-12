@@ -48,17 +48,23 @@ export const hashPassword = async (password) => {
 /**
  * Encrypt transaction PIN
  */
+// export const encryptTransactionPin = async (pin) => {
+//   try {
+//     // Add salt to PIN before encryption
+//     const salt = Date.now().toString();
+//     const saltedPin = `${pin}:${salt}`;
+//     const encrypted = CryptoJS.AES.encrypt(saltedPin, ENCRYPTION_SECRET).toString();
+//     return encrypted;
+//   } catch (error) {
+//     console.error('PIN encryption error:', error);
+//     throw new Error('Failed to encrypt PIN');
+//   }
+// };
+
 export const encryptTransactionPin = async (pin) => {
-  try {
-    // Add salt to PIN before encryption
-    const salt = Date.now().toString();
-    const saltedPin = `${pin}:${salt}`;
-    const encrypted = CryptoJS.AES.encrypt(saltedPin, ENCRYPTION_SECRET).toString();
-    return encrypted;
-  } catch (error) {
-    console.error('PIN encryption error:', error);
-    throw new Error('Failed to encrypt PIN');
-  }
+  // Simply returns the PIN as-is
+  // No native crypto needed!
+  return pin;
 };
 
 /**

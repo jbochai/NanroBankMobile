@@ -26,10 +26,10 @@ export const intraBankTransfer = createAsyncThunk(
       if (response.success) {
         return response.data;
       } else {
-        return rejectWithValue(response);
+        return rejectWithValue(response.message || 'Transfer failed');
       }
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error?.response?.data?.message || error.message || 'Transfer failed');
     }
   }
 );
@@ -42,10 +42,10 @@ export const interBankTransfer = createAsyncThunk(
       if (response.success) {
         return response.data;
       } else {
-        return rejectWithValue(response);
+        return rejectWithValue(response.message || 'Transfer failed');
       }
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error?.response?.data?.message || error.message || 'Transfer failed');
     }
   }
 );
@@ -58,10 +58,10 @@ export const verifyAccount = createAsyncThunk(
       if (response.success) {
         return response.data;
       } else {
-        return rejectWithValue(response);
+        return rejectWithValue(response.message || 'Account verification failed');
       }
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error?.response?.data?.message || error.message || 'Account verification failed');
     }
   }
 );
@@ -74,10 +74,16 @@ export const fetchBeneficiaries = createAsyncThunk(
       if (response.success) {
         return response.data;
       } else {
-        return rejectWithValue(response);
+        return rejectWithValue(response.message || 'Failed to fetch beneficiaries');
       }
     } catch (error) {
-      return rejectWithValue(error.message);
+      // Check if it's a 404 error - beneficiaries endpoint might not exist yet
+      if (error?.response?.status === 404 || error?.statusCode === 404) {
+        // Return empty array instead of failing
+        console.warn('Beneficiaries endpoint not found, returning empty array');
+        return [];
+      }
+      return rejectWithValue(error?.response?.data?.message || error.message || 'Failed to fetch beneficiaries');
     }
   }
 );
@@ -90,10 +96,10 @@ export const addBeneficiary = createAsyncThunk(
       if (response.success) {
         return response.data;
       } else {
-        return rejectWithValue(response);
+        return rejectWithValue(response.message || 'Failed to add beneficiary');
       }
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error?.response?.data?.message || error.message || 'Failed to add beneficiary');
     }
   }
 );
@@ -106,26 +112,31 @@ export const deleteBeneficiary = createAsyncThunk(
       if (response.success) {
         return { id: beneficiaryId };
       } else {
-        return rejectWithValue(response);
+        return rejectWithValue(response.message || 'Failed to delete beneficiary');
       }
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error?.response?.data?.message || error.message || 'Failed to delete beneficiary');
     }
   }
 );
 
 export const fetchBankList = createAsyncThunk(
-  'transfer/fetchBankList',
+  'transfer/fetch-bank-list',
   async (_, { rejectWithValue }) => {
     try {
       const response = await TransferService.getBankList();
       if (response.success) {
         return response.data;
       } else {
-        return rejectWithValue(response);
+        return rejectWithValue(response.message || 'Failed to fetch banks');
       }
     } catch (error) {
-      return rejectWithValue(error.message);
+      // Check if it's a 404 error - bank list endpoint might not exist yet
+      if (error?.response?.status === 404 || error?.statusCode === 404) {
+        console.warn('Bank list endpoint not found, returning empty array');
+        return [];
+      }
+      return rejectWithValue(error?.response?.data?.message || error.message || 'Failed to fetch banks');
     }
   }
 );
@@ -138,10 +149,10 @@ export const fetchTransferLimits = createAsyncThunk(
       if (response.success) {
         return response.data;
       } else {
-        return rejectWithValue(response);
+        return rejectWithValue(response.message || 'Failed to fetch transfer limits');
       }
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error?.response?.data?.message || error.message || 'Failed to fetch transfer limits');
     }
   }
 );
@@ -187,7 +198,7 @@ const transferSlice = createSlice({
       })
       .addCase(intraBankTransfer.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload?.message || 'Transfer failed';
+        state.error = action.payload || 'Transfer failed';
       });
 
     // Inter-bank Transfer
@@ -204,7 +215,7 @@ const transferSlice = createSlice({
       })
       .addCase(interBankTransfer.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload?.message || 'Transfer failed';
+        state.error = action.payload || 'Transfer failed';
       });
 
     // Verify Account
@@ -220,7 +231,7 @@ const transferSlice = createSlice({
       })
       .addCase(verifyAccount.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload?.message || 'Account verification failed';
+        state.error = action.payload || 'Account verification failed';
         state.verifiedAccount = null;
       });
 
@@ -232,11 +243,12 @@ const transferSlice = createSlice({
       })
       .addCase(fetchBeneficiaries.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.beneficiaries = action.payload;
+        state.beneficiaries = action.payload || [];
       })
       .addCase(fetchBeneficiaries.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload?.message || 'Failed to fetch beneficiaries';
+        // Don't set error for beneficiaries - just use empty array
+        state.beneficiaries = [];
       });
 
     // Add Beneficiary
@@ -251,7 +263,7 @@ const transferSlice = createSlice({
       })
       .addCase(addBeneficiary.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload?.message || 'Failed to add beneficiary';
+        state.error = action.payload || 'Failed to add beneficiary';
       });
 
     // Delete Beneficiary
@@ -268,7 +280,7 @@ const transferSlice = createSlice({
       })
       .addCase(deleteBeneficiary.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload?.message || 'Failed to delete beneficiary';
+        state.error = action.payload || 'Failed to delete beneficiary';
       });
 
     // Fetch Bank List
@@ -278,11 +290,12 @@ const transferSlice = createSlice({
       })
       .addCase(fetchBankList.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.banks = action.payload;
+        state.banks = action.payload || [];
       })
       .addCase(fetchBankList.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload?.message || 'Failed to fetch banks';
+        // Don't set error for banks - just use empty array
+        state.banks = [];
       });
 
     // Fetch Transfer Limits
@@ -299,7 +312,7 @@ const transferSlice = createSlice({
       })
       .addCase(fetchTransferLimits.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload?.message || 'Failed to fetch transfer limits';
+        state.error = action.payload || 'Failed to fetch transfer limits';
       });
   },
 });

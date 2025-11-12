@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -59,6 +59,10 @@ const TransferScreen = () => {
   const [showPinModal, setShowPinModal] = useState(false);
   const [pin, setPin] = useState('');
   const [saveBeneficiary, setSaveBeneficiary] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  // Add ref for PIN input
+  const pinInputRef = useRef(null);
 
   useEffect(() => {
     loadInitialData();
@@ -67,14 +71,33 @@ const TransferScreen = () => {
     };
   }, []);
 
+  // Focus PIN input when modal opens
+  useEffect(() => {
+    if (showPinModal) {
+      // Delay to ensure modal animation completes
+      const timer = setTimeout(() => {
+        if (pinInputRef.current) {
+          pinInputRef.current.focus();
+        }
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    } else {
+      // Clear PIN when modal closes
+      setPin('');
+    }
+  }, [showPinModal]);
+
   const loadInitialData = async () => {
     try {
-      await Promise.all([
-        dispatch(fetchBeneficiaries()).unwrap(),
-        dispatch(fetchBankList()).unwrap(),
+      // Load beneficiaries and banks without failing if endpoints don't exist
+      await Promise.allSettled([
+        dispatch(fetchBeneficiaries()),
+        dispatch(fetchBankList()),
       ]);
     } catch (error) {
       console.error('Failed to load transfer data:', error);
+      // Don't show error toast - just log it
     }
   };
 
@@ -95,11 +118,26 @@ const TransferScreen = () => {
     // Limit to 10 digits for Nigerian account numbers
     if (cleaned.length <= 10) {
       setAccountNumber(cleaned);
+      
+      // Auto-verify when 10 digits reached
+      if (cleaned.length === 10) {
+        // Small delay to ensure state is updated
+        setTimeout(() => {
+          handleVerifyAccount(cleaned);
+        }, 100);
+      } else {
+        // Clear verification when user edits
+        if (verifiedAccount) {
+          dispatch(clearVerifiedAccount());
+        }
+      }
     }
   };
 
-  const handleVerifyAccount = async () => {
-    if (!accountNumber || accountNumber.length !== 10) {
+  const handleVerifyAccount = async (accountNum = null) => {
+    const accNumber = accountNum || accountNumber;
+    
+    if (!accNumber || accNumber.length !== 10) {
       Toast.show({
         type: 'error',
         text1: 'Invalid Account Number',
@@ -117,9 +155,11 @@ const TransferScreen = () => {
       return;
     }
 
+    setIsVerifying(true);
+
     try {
       const verifyData = {
-        account_number: accountNumber,
+        account_number: accNumber,
         ...(transferType === 'inter' && { bank_code: selectedBank.code }),
       };
 
@@ -135,6 +175,8 @@ const TransferScreen = () => {
         text1: 'Verification Failed',
         text2: error.message || 'Unable to verify account',
       });
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -177,7 +219,8 @@ const TransferScreen = () => {
       return;
     }
 
-    // Show PIN modal
+    // Show PIN modal and clear any previous PIN
+    setPin('');
     setShowPinModal(true);
   };
 
@@ -199,28 +242,38 @@ const TransferScreen = () => {
         amount: parseAmount(amount),
         description: description.trim(),
         transaction_pin: pin,
-        save_beneficiary: saveBeneficiary,
+        bank_code: '044',
+       // save_beneficiary: saveBeneficiary,
       };
 
       let result;
       if (transferType === 'intra') {
+        console.log('About to do a transaction for:', transferType);
         result = await dispatch(intraBankTransfer(transferData)).unwrap();
+        console.log('Intra transfer result:', result);
       } else {
         transferData.bank_code = selectedBank.code;
         result = await dispatch(interBankTransfer(transferData)).unwrap();
       }
 
-      // Navigate to success screen
-      navigation.navigate('TransferSuccess', {
-        transfer: result,
-        amount: parseAmount(amount),
-        recipient: verifiedAccount.account_name,
-        accountNumber: accountNumber,
-        bank: transferType === 'inter' ? selectedBank.name : 'Nanro Bank',
+      // Show success toast
+      Toast.show({
+        type: 'success',
+        text1: 'Transfer Successful!',
+        text2: `₦${parseAmount(amount).toLocaleString()} sent to ${verifiedAccount.account_name}`,
+        visibilityTime: 3000,
       });
 
-      // Reset form
+      // Reset form first
       resetForm();
+
+      // Navigate to TransactionDetail screen with the transaction data
+      setTimeout(() => {
+        navigation.navigate('TransactionDetail', {
+          transaction: result,
+        });
+      }, 500);
+
     } catch (error) {
       Toast.show({
         type: 'error',
@@ -327,17 +380,31 @@ const TransferScreen = () => {
   const renderPinModal = () => (
     <Modal
       visible={showPinModal}
-      animationType="slide"
+      animationType="fade"
       transparent={true}
-      onRequestClose={() => setShowPinModal(false)}>
-      <View style={styles.modalOverlay}>
-        <View style={styles.pinModalContent}>
+      onRequestClose={() => {
+        setShowPinModal(false);
+        setPin('');
+      }}>
+      <TouchableOpacity 
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={() => {
+          // Close modal when clicking outside
+          setShowPinModal(false);
+          setPin('');
+        }}>
+        <TouchableOpacity
+          style={styles.pinModalContent}
+          activeOpacity={1}
+          onPress={(e) => e.stopPropagation()}>
           <Text style={styles.pinModalTitle}>Enter Transaction PIN</Text>
           <Text style={styles.pinModalSubtitle}>
             Enter your 4-digit PIN to confirm this transfer
           </Text>
           
-          <View style={styles.pinInputContainer}>
+          {/* PIN Display Boxes */}
+          <View style={styles.pinDisplayContainer}>
             {[0, 1, 2, 3].map((index) => (
               <View
                 key={index}
@@ -352,22 +419,29 @@ const TransferScreen = () => {
             ))}
           </View>
           
-          <TextInput
-            style={styles.hiddenInput}
-            value={pin}
-            onChangeText={(text) => {
-              if (text.length <= 4 && /^\d*$/.test(text)) {
-                setPin(text);
-                if (text.length === 4) {
-                  handleConfirmTransfer();
+          {/* Actual Input Field - Made visible but styled to blend */}
+          <View style={styles.pinInputWrapper}>
+            <TextInput
+              ref={pinInputRef}
+              style={styles.pinInput}
+              value={pin}
+              onChangeText={(text) => {
+                if (/^\d*$/.test(text) && text.length <= 4) {
+                  setPin(text);
                 }
-              }
-            }}
-            keyboardType="numeric"
-            maxLength={4}
-            autoFocus
-            caretHidden
-          />
+              }}
+              placeholder="Enter PIN"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="number-pad"
+              maxLength={4}
+              autoFocus={true}
+              secureTextEntry={false}
+              caretHidden={false}
+              contextMenuHidden={true}
+              selectTextOnFocus={true}
+              editable={!isLoading}
+            />
+          </View>
           
           <View style={styles.pinModalButtons}>
             <Button
@@ -382,13 +456,13 @@ const TransferScreen = () => {
             <Button
               title="Confirm"
               onPress={handleConfirmTransfer}
-              disabled={pin.length !== 4}
+              disabled={pin.length !== 4 || isLoading}
               loading={isLoading}
               style={styles.pinModalButton}
             />
           </View>
-        </View>
-      </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 
@@ -492,9 +566,20 @@ const TransferScreen = () => {
             keyboardType="numeric"
             maxLength={13} // 10 digits + 2 spaces
             leftIcon="credit-card"
-            rightIcon={verifiedAccount ? 'check-circle' : 'search'}
-            onRightIconPress={handleVerifyAccount}
+            rightIcon={isVerifying ? 'hourglass-empty' : (verifiedAccount ? 'check-circle' : 'search')}
+            onRightIconPress={() => handleVerifyAccount()}
+            editable={!isVerifying}
           />
+
+          {/* Verification Loading */}
+          {isVerifying && (
+            <Animatable.View
+              animation="fadeIn"
+              duration={300}
+              style={styles.verifyingContainer}>
+              <Text style={styles.verifyingText}>Verifying account...</Text>
+            </Animatable.View>
+          )}
 
           {/* Verified Account Info */}
           {verifiedAccount && (
@@ -712,6 +797,20 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
     marginTop: 2,
   },
+  verifyingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.sm,
+    backgroundColor: Colors.infoLight,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.lg,
+  },
+  verifyingText: {
+    fontSize: 12,
+    fontFamily: Fonts.medium,
+    color: Colors.primary,
+    marginLeft: Spacing.xs,
+  },
   amountContainer: {
     marginBottom: Spacing.lg,
   },
@@ -818,13 +917,17 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContent: {
     backgroundColor: Colors.white,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '70%',
+    width: '100%',
+    position: 'absolute',
+    bottom: 0,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -857,10 +960,11 @@ const styles = StyleSheet.create({
   },
   pinModalContent: {
     backgroundColor: Colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderRadius: 24,
     padding: Spacing.xl,
     alignItems: 'center',
+    width: '90%',
+    maxWidth: 400,
   },
   pinModalTitle: {
     fontSize: 20,
@@ -875,7 +979,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: Spacing.xl,
   },
-  pinInputContainer: {
+  pinDisplayContainer: {
     flexDirection: 'row',
     gap: Spacing.md,
     marginBottom: Spacing.xl,
@@ -888,6 +992,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: Colors.white,
   },
   pinBoxFilled: {
     borderColor: Colors.primary,
@@ -897,9 +1002,21 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: Colors.primary,
   },
-  hiddenInput: {
-    position: 'absolute',
-    opacity: 0,
+  pinInputWrapper: {
+    width: '100%',
+    marginBottom: Spacing.lg,
+  },
+  pinInput: {
+    width: '100%',
+    padding: Spacing.md,
+    fontSize: 16,
+    fontFamily: Fonts.medium,
+    color: Colors.text,
+    backgroundColor: Colors.backgroundLight,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    textAlign: 'center',
   },
   pinModalButtons: {
     flexDirection: 'row',
