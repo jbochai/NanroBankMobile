@@ -219,3 +219,6 @@ export const selectDailyTransferLimit = (state) => state.account.dailyTransferLi
 export const selectDailyTransferUsed = (state) => state.account.dailyTransferUsed;
 export const selectAccountLoading = (state) => state.account.isLoading;
 export const selectAccountError = (state) => state.account.error;
+export const selectPrimaryAccount = (state) => state.account.primaryAccount;
+// Should have these selectors at the bottom:
+export const selectAccounts = (state) => state.account.accounts;

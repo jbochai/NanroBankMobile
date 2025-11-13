@@ -28,6 +28,7 @@ import {
 import { 
   fetchRecentTransactions,
   selectRecentTransactions,
+  selectRecentTransactionsMemoized,
 } from '../../store/transaction/transactionSlice';
 import { Colors } from '../../styles/colors';
 import { Fonts, Typography } from '../../styles/fonts';
@@ -41,8 +42,8 @@ const DashboardScreen = () => {
   const balance = useSelector(selectBalance);
   const availableBalance = useSelector(selectAvailableBalance);
   const accountNumber = useSelector(selectAccountNumber);
-  const recentTransactions = useSelector(selectRecentTransactions);
-  
+  //const recentTransactions = useSelector(selectRecentTransactions);
+  const recentTransactions = useSelector(selectRecentTransactionsMemoized);
   const [refreshing, setRefreshing] = useState(false);
   const [balanceVisible, setBalanceVisible] = useState(true);
   const [selectedService, setSelectedService] = useState(null);

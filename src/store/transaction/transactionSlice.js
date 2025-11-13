@@ -1,6 +1,8 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import TransactionService from '../../api/transaction';
 import api from '../../api/client';
+import { createSelector } from '@reduxjs/toolkit';
+
 
 // Initial state
 const initialState = {
@@ -298,3 +300,41 @@ export const selectTransactionLoadingMore = (state) => state.transaction.isLoadi
 export const selectTransactionError = (state) => state.transaction.error;
 export const selectHasMoreTransactions = (state) => 
   state.transaction.pagination.currentPage < state.transaction.pagination.totalPages;
+export const selectIsLoading = (state) => state.transaction.isLoading;
+export const selectError = (state) => state.transaction.error;
+export const selectPagination = (state) => state.transaction.pagination;
+export const selectFilters = (state) => state.transaction.filters;
+
+
+
+// Memoized selector for recent transactions (FIXED VERSION)
+export const selectRecentTransactionsMemoized = createSelector(
+  [selectRecentTransactions],
+  (recentTransactions) => recentTransactions
+);
+
+// Memoized selector for filtered transactions
+export const selectFilteredTransactions = createSelector(
+  [selectTransactions, selectFilters],
+  (transactions, filters) => {
+    if (!filters || Object.keys(filters).length === 0) {
+      return transactions;
+    }
+
+    return transactions.filter(transaction => {
+      if (filters.type && transaction.type !== filters.type) {
+        return false;
+      }
+      if (filters.status && transaction.status !== filters.status) {
+        return false;
+      }
+      if (filters.startDate && new Date(transaction.created_at) < new Date(filters.startDate)) {
+        return false;
+      }
+      if (filters.endDate && new Date(transaction.created_at) > new Date(filters.endDate)) {
+        return false;
+      }
+      return true;
+    });
+  }
+);
