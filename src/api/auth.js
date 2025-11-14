@@ -1786,6 +1786,60 @@ async clearAuthData(preserveBiometric = true) {
     console.error('❌ Error clearing auth data:', error);
     return false;
   }
+},
+/**
+ * Setup transaction PIN for the first time
+ * @param {string} pin - 4-digit PIN
+ * @param {string} pinConfirmation - Confirmation PIN
+ * @returns {Promise<Object>} - Response with success status
+ */
+async setupPin(pin, pinConfirmation) {
+  try {
+    console.log('🔐 Setting up transaction PIN...');
+
+    const response = await api.post('/account/set-pin', {
+      pin,
+      pin_confirmation: pinConfirmation,
+    });
+
+    if (response.data?.success) {
+      console.log('✅ PIN setup successful');
+      return {
+        success: true,
+        message: response.data.message || 'PIN setup successful',
+      };
+    }
+
+    return {
+      success: false,
+      message: response.data?.message || 'Failed to setup PIN',
+    };
+  } catch (error) {
+    console.error('❌ Setup PIN error:', error.response?.data || error.message);
+    
+    return {
+      success: false,
+      message: error.response?.data?.message || 'An error occurred while setting up PIN',
+    };
+  }
+},
+
+/**
+ * Check if user has set up their transaction PIN
+ * @returns {Promise<boolean>}
+ */
+async hasPinSetup() {
+  try {
+    // You might need to add an API endpoint to check this
+    // For now, we can try to get user profile and check if pin is set
+    const response = await api.get('/user/profile');
+    
+    // Assuming API returns has_pin or similar field
+    return response.data?.data?.has_pin || false;
+  } catch (error) {
+    console.error('Error checking PIN setup:', error);
+    return false;
+  }
 }
 };
 

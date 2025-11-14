@@ -38,6 +38,8 @@ import AboutScreen from '../screens/about/AboutScreen';
 import RequestCardScreen from '../screens/cards/RequestCardScreen';
 import AnnouncementDetailScreen from '../screens/announcements/AnnouncementDetailScreen';
 import TransferSuccessScreen  from '../screens/transfer/TransferSuccessScreen';
+import SetupPinScreen from '../screens/profile/SetupPinScreen';
+
 
 // Import placeholder component
 import PlaceholderScreen from '../components/common/PlaceholderScreen';
@@ -111,6 +113,7 @@ const MainNavigator = () => {
       <Stack.Screen name="About" component={AboutScreen} />
       <Stack.Screen name="RequestCard" component={RequestCardScreen} />
       <Stack.Screen name="AnnouncementDetail" component={AnnouncementDetailScreen} />
+      <Stack.Screen name="SetupPin" component={SetupPinScreen} options={{ headerShown: false }}/>
       <Stack.Screen name="TransferSuccess"   component={TransferSuccessScreen}  options={{ headerShown: false }}/>
     </Stack.Navigator>
   );

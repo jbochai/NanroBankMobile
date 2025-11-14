@@ -35,13 +35,14 @@ const SecuritySettingsScreen = () => {
 
   // Initialize biometric from Redux state immediately to prevent flashing
   const [settings, setSettings] = useState({
-    biometric: biometricEnabled, // ← Start with Redux state
+    biometric: biometricEnabled,
     twoFactor: false,
     loginNotifications: true,
     transactionAlerts: true,
   });
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricType, setBiometricType] = useState('');
+  const [hasPinSetup, setHasPinSetup] = useState(null); // null = checking, true/false = checked
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinModalConfig, setPinModalConfig] = useState({
     title: '',
@@ -54,6 +55,7 @@ const SecuritySettingsScreen = () => {
   // Initial load
   useEffect(() => {
     checkBiometricAvailability();
+    checkPinSetup();
     loadSettings();
   }, []);
 
@@ -61,6 +63,7 @@ const SecuritySettingsScreen = () => {
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       console.log('SecuritySettings - Screen focused, reloading...');
+      checkPinSetup();
       loadSettings();
     });
 
@@ -76,6 +79,13 @@ const SecuritySettingsScreen = () => {
     }));
   }, [biometricEnabled]);
 
+  // Watch for user changes to update PIN status
+  useEffect(() => {
+    if (user) {
+      checkPinSetup();
+    }
+  }, [user]);
+
   const checkBiometricAvailability = async () => {
     try {
       const { available, biometryType } = await rnBiometrics.isSensorAvailable();
@@ -86,6 +96,24 @@ const SecuritySettingsScreen = () => {
     } catch (error) {
       console.error('SecuritySettings - Biometric check error:', error);
       setBiometricAvailable(false);
+    }
+  };
+
+  const checkPinSetup = async () => {
+    try {
+      console.log('========================================');
+      console.log('SecuritySettings - Checking PIN setup...');
+      console.log('User has_pin:', user?.has_pin);
+      console.log('========================================');
+      
+      // Check the has_pin attribute from user object
+      const isPinSet = user?.has_pin === true;
+      
+      console.log('✅ SecuritySettings - PIN setup status:', isPinSet);
+      setHasPinSetup(isPinSet);
+    } catch (error) {
+      console.error('SecuritySettings - Error checking PIN setup:', error);
+      setHasPinSetup(true); // Default to true on error to avoid blocking users
     }
   };
 
@@ -213,11 +241,26 @@ const SecuritySettingsScreen = () => {
       return;
     }
 
+    // Check if PIN is setup first
+    if (!hasPinSetup) {
+      Alert.alert(
+        'Setup PIN First',
+        'You need to setup your transaction PIN before enabling biometric login.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Setup PIN',
+            onPress: () => navigation.navigate('SetupPin'),
+          },
+        ]
+      );
+      return;
+    }
+
     try {
       if (!settings.biometric) {
         // Enabling biometric
         if (Platform.OS === 'ios') {
-          // Use Alert.prompt for iOS
           Alert.prompt(
             'Enable Biometric Login',
             `Enter your 4-digit transaction PIN to enable ${biometricType} login`,
@@ -244,7 +287,6 @@ const SecuritySettingsScreen = () => {
             'secure-text'
           );
         } else {
-          // Use custom modal for Android
           setPinModalConfig({
             title: 'Enable Biometric Login',
             message: `Enter your 4-digit transaction PIN to enable ${biometricType} login`,
@@ -255,7 +297,6 @@ const SecuritySettingsScreen = () => {
       } else {
         // Disabling biometric
         if (Platform.OS === 'ios') {
-          // Use Alert.prompt for iOS
           Alert.prompt(
             'Disable Biometric Login',
             'Enter your 4-digit transaction PIN to disable biometric login',
@@ -283,7 +324,6 @@ const SecuritySettingsScreen = () => {
             'secure-text'
           );
         } else {
-          // Use custom modal for Android
           setPinModalConfig({
             title: 'Disable Biometric Login',
             message: 'Enter your 4-digit transaction PIN to disable biometric login',
@@ -328,40 +368,62 @@ const SecuritySettingsScreen = () => {
     });
   };
 
-  const securityOptions = [
-    {
-      id: 1,
-      title: 'Change Password',
-      description: 'Update your account password',
-      icon: 'lock',
-      color: Colors.primary,
-      onPress: () => navigation.navigate('ChangePassword'),
-    },
-    {
-      id: 2,
-      title: 'Change Transaction PIN',
-      description: 'Update your 4-digit transaction PIN',
-      icon: 'pin',
-      color: '#ff9800',
-      onPress: () => navigation.navigate('ChangePin'),
-    },
-    {
-      id: 3,
-      title: 'Transaction Limits',
-      description: 'Set daily transaction limits',
-      icon: 'account-balance',
-      color: '#4caf50',
-      onPress: () => navigation.navigate('TransactionLimits'),
-    },
-    {
-      id: 4,
-      title: 'Linked Accounts',
-      description: 'Manage linked bank accounts',
-      icon: 'link',
-      color: '#2196f3',
-      onPress: () => navigation.navigate('LinkedAccounts'),
-    },
-  ];
+  // Dynamic security options based on PIN setup status
+  const getSecurityOptions = () => {
+    const options = [
+      {
+        id: 1,
+        title: 'Change Password',
+        description: 'Update your account password',
+        icon: 'lock',
+        color: Colors.primary,
+        onPress: () => navigation.navigate('ChangePassword'),
+      },
+    ];
+
+    // Show Setup or Change PIN based on has_pin status
+    if (hasPinSetup === false) {
+      options.push({
+        id: 2,
+        title: 'Setup Transaction PIN',
+        description: 'Create your 4-digit transaction PIN',
+        icon: 'add-circle',
+        color: '#ff9800',
+        onPress: () => navigation.navigate('SetupPin'),
+        badge: 'Required',
+      });
+    } else if (hasPinSetup === true) {
+      options.push({
+        id: 2,
+        title: 'Change Transaction PIN',
+        description: 'Update your 4-digit transaction PIN',
+        icon: 'pin',
+        color: '#ff9800',
+        onPress: () => navigation.navigate('ChangePin'),
+      });
+    }
+
+    options.push(
+      {
+        id: 3,
+        title: 'Transaction Limits',
+        description: 'Set daily transaction limits',
+        icon: 'account-balance',
+        color: '#4caf50',
+        onPress: () => navigation.navigate('TransactionLimits'),
+      },
+      {
+        id: 4,
+        title: 'Linked Accounts',
+        description: 'Manage linked bank accounts',
+        icon: 'link',
+        color: '#2196f3',
+        onPress: () => navigation.navigate('LinkedAccounts'),
+      }
+    );
+
+    return options;
+  };
 
   const renderSecurityOption = (option) => (
     <TouchableOpacity
@@ -372,7 +434,14 @@ const SecuritySettingsScreen = () => {
         <Icon name={option.icon} size={24} color={option.color} />
       </View>
       <View style={styles.optionContent}>
-        <Text style={styles.optionTitle}>{option.title}</Text>
+        <View style={styles.optionTitleRow}>
+          <Text style={styles.optionTitle}>{option.title}</Text>
+          {option.badge && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{option.badge}</Text>
+            </View>
+          )}
+        </View>
         <Text style={styles.optionDescription}>{option.description}</Text>
       </View>
       <Icon name="chevron-right" size={24} color={Colors.textLight} />
@@ -481,7 +550,7 @@ const SecuritySettingsScreen = () => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Security Options</Text>
-          {securityOptions.map(renderSecurityOption)}
+          {getSecurityOptions().map(renderSecurityOption)}
         </View>
 
         <View style={styles.infoCard}>
@@ -586,11 +655,27 @@ const styles = StyleSheet.create({
   optionContent: {
     flex: 1,
   },
+  optionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
   optionTitle: {
     fontSize: 14,
     fontFamily: Fonts.medium,
     color: Colors.text,
-    marginBottom: 2,
+  },
+  badge: {
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontFamily: Fonts.semiBold,
+    color: Colors.white,
   },
   optionDescription: {
     fontSize: 12,
