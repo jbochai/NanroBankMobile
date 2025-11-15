@@ -63,6 +63,29 @@ const SettingsScreen = () => {
 
   const settingsSections = [
     {
+      title: 'Account',
+      items: [
+        {
+          id: 'kyc',
+          label: 'KYC Verification',
+          description: 'Verify your identity',
+          type: 'navigate',
+          screen: 'KYC',
+          icon: 'verified-user',
+          iconColor: Colors.primary,
+        },
+        {
+          id: 'personalInfo',
+          label: 'Personal Information',
+          description: 'Update your profile details',
+          type: 'navigate',
+          screen: 'PersonalInfo',
+          icon: 'person',
+          iconColor: '#4caf50',
+        },
+      ],
+    },
+    {
       title: 'Notifications',
       items: [
         {
@@ -117,6 +140,13 @@ const SettingsScreen = () => {
           label: 'Auto-Lock',
           description: 'Lock app after inactivity',
           type: 'toggle',
+        },
+        {
+          id: 'securitySettings',
+          label: 'Security Settings',
+          description: 'Manage security options',
+          type: 'navigate',
+          screen: 'SecuritySettings',
         },
         {
           id: 'changePin',
@@ -187,6 +217,15 @@ const SettingsScreen = () => {
           style={styles.settingItem}
           onPress={() => navigation.navigate(item.screen)}
           activeOpacity={0.7}>
+          {item.icon && (
+            <View style={styles.iconContainer}>
+              <Icon 
+                name={item.icon} 
+                size={24} 
+                color={item.iconColor || Colors.textLight} 
+              />
+            </View>
+          )}
           <View style={styles.settingContent}>
             <Text style={styles.settingLabel}>{item.label}</Text>
             <Text style={styles.settingDescription}>{item.description}</Text>
@@ -268,6 +307,12 @@ const SettingsScreen = () => {
             </TouchableOpacity>
           </Card>
         </View>
+
+        {/* App Info */}
+        <View style={styles.appInfo}>
+          <Text style={styles.appInfoText}>Nanro Bank v1.0.0</Text>
+          <Text style={styles.appInfoText}>© 2025 Starcode Technology</Text>
+        </View>
       </ScrollView>
 
       <Loader visible={loading} />
@@ -304,6 +349,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: Spacing.md,
   },
+  iconContainer: {
+    marginRight: Spacing.sm,
+  },
   settingContent: {
     flex: 1,
     marginRight: Spacing.md,
@@ -324,6 +372,16 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: Colors.border,
     marginLeft: Spacing.md,
+  },
+  appInfo: {
+    alignItems: 'center',
+    paddingVertical: Spacing.xl,
+  },
+  appInfoText: {
+    fontSize: 12,
+    fontFamily: Fonts.regular,
+    color: Colors.textLight,
+    marginBottom: 4,
   },
 });
 

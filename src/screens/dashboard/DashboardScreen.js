@@ -34,6 +34,7 @@ import { Colors } from '../../styles/colors';
 import { Fonts, Typography } from '../../styles/fonts';
 import { Spacing, BorderRadius, Shadows } from '../../styles/spacing';
 import { formatCurrency, formatRelativeTime } from '../../utils/formatting';
+import { fetchUnreadCount, selectUnreadCount,} from '../../store/notification/notificationSlice';
 
 const DashboardScreen = () => {
   const dispatch = useDispatch();
@@ -46,6 +47,7 @@ const DashboardScreen = () => {
   const recentTransactions = useSelector(selectRecentTransactionsMemoized);
   const [refreshing, setRefreshing] = useState(false);
   const [balanceVisible, setBalanceVisible] = useState(true);
+  const unreadCount = useSelector(selectUnreadCount); // ← ADD THIS
   const [selectedService, setSelectedService] = useState(null);
 
   useEffect(() => {
@@ -57,6 +59,8 @@ const DashboardScreen = () => {
       await Promise.all([
         dispatch(fetchAccountBalance()).unwrap(),
         dispatch(fetchRecentTransactions({ limit: 5 })).unwrap(),
+        dispatch(fetchUnreadCount()).unwrap(), 
+
       ]);
     } catch (error) {
       console.log('Dashboard data load error:', error);
@@ -196,14 +200,16 @@ const DashboardScreen = () => {
               onPress={() => navigation.navigate('QRScanner')}>
               <Icon name="qr-code-scanner" size={24} color={Colors.white} />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.headerButton}
-              onPress={() => navigation.navigate('Notifications')}>
-              <Icon name="notifications" size={24} color={Colors.white} />
-              <View style={styles.notificationBadge}>
-                <Text style={styles.badgeText}>3</Text>
-              </View>
-            </TouchableOpacity>
+          <TouchableOpacity
+          style={styles.headerButton}
+          onPress={() => navigation.navigate('Notifications')}>
+          <Icon name="notifications" size={24} color={Colors.white} />
+          {unreadCount > 0 && (
+          <View style={styles.notificationBadge}>
+          <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+          </View>
+          )}
+          </TouchableOpacity>
           </View>
         </View>
 

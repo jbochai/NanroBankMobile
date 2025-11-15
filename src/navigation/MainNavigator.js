@@ -39,6 +39,7 @@ import RequestCardScreen from '../screens/cards/RequestCardScreen';
 import AnnouncementDetailScreen from '../screens/announcements/AnnouncementDetailScreen';
 import TransferSuccessScreen  from '../screens/transfer/TransferSuccessScreen';
 import SetupPinScreen from '../screens/profile/SetupPinScreen';
+import KYCScreen from '../screens/kyc/KYCScreen';
 
 
 // Import placeholder component
@@ -114,6 +115,7 @@ const MainNavigator = () => {
       <Stack.Screen name="RequestCard" component={RequestCardScreen} />
       <Stack.Screen name="AnnouncementDetail" component={AnnouncementDetailScreen} />
       <Stack.Screen name="SetupPin" component={SetupPinScreen} options={{ headerShown: false }}/>
+      <Stack.Screen name="KYC" component={KYCScreen} options={{ headerShown: false }}/>
       <Stack.Screen name="TransferSuccess"   component={TransferSuccessScreen}  options={{ headerShown: false }}/>
     </Stack.Navigator>
   );

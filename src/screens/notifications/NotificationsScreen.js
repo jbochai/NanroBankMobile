@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,15 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import moment from 'moment';
+import Toast from 'react-native-toast-message';
+
+import NotificationService from '../../api/notification';
 import { Colors } from '../../styles/colors';
 import { Fonts } from '../../styles/fonts';
 import { Spacing } from '../../styles/spacing';
@@ -17,110 +22,208 @@ import { Spacing } from '../../styles/spacing';
 const NotificationsScreen = () => {
   const navigation = useNavigation();
   const [refreshing, setRefreshing] = useState(false);
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      type: 'transaction',
-      title: 'Credit Alert',
-      message: 'Your account has been credited with ₦50,000',
-      timestamp: '2 hours ago',
-      read: false,
-      icon: 'account-balance-wallet',
-      color: Colors.success,
-    },
-    {
-      id: 2,
-      type: 'transfer',
-      title: 'Transfer Successful',
-      message: 'You sent ₦10,000 to John Doe',
-      timestamp: '5 hours ago',
-      read: false,
-      icon: 'send',
-      color: Colors.primary,
-    },
-    {
-      id: 3,
-      type: 'security',
-      title: 'New Login Detected',
-      message: 'Your account was accessed from a new device',
-      timestamp: '1 day ago',
-      read: true,
-      icon: 'security',
-      color: Colors.warning,
-    },
-    {
-      id: 4,
-      type: 'bill',
-      title: 'Bill Payment Successful',
-      message: 'DSTV subscription payment of ₦8,000 completed',
-      timestamp: '2 days ago',
-      read: true,
-      icon: 'receipt',
-      color: '#2196f3',
-    },
-    {
-      id: 5,
-      type: 'promo',
-      title: 'Special Offer',
-      message: 'Get 5% cashback on all transfers this week!',
-      timestamp: '3 days ago',
-      read: true,
-      icon: 'local-offer',
-      color: '#ff9800',
-    },
-  ]);
+  const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1500);
-  };
-
-  const handleMarkAsRead = (id) => {
-    setNotifications(notifications.map(notif => 
-      notif.id === id ? { ...notif, read: true } : notif
-    ));
-  };
-
-  const handleMarkAllAsRead = () => {
-    setNotifications(notifications.map(notif => ({ ...notif, read: true })));
-  };
-
-  const handleDeleteNotification = (id) => {
-    setNotifications(notifications.filter(notif => notif.id !== id));
-  };
-
-  const unreadCount = notifications.filter(n => !n.read).length;
-
-  const renderNotification = (notification) => (
-    <TouchableOpacity
-      key={notification.id}
-      style={[
-        styles.notificationCard,
-        !notification.read && styles.unreadCard,
-      ]}
-      onPress={() => handleMarkAsRead(notification.id)}>
-      <View style={[styles.iconContainer, { backgroundColor: notification.color + '20' }]}>
-        <Icon name={notification.icon} size={24} color={notification.color} />
-      </View>
-      
-      <View style={styles.notificationContent}>
-        <View style={styles.notificationHeader}>
-          <Text style={styles.notificationTitle}>{notification.title}</Text>
-          {!notification.read && <View style={styles.unreadDot} />}
-        </View>
-        <Text style={styles.notificationMessage}>{notification.message}</Text>
-        <Text style={styles.notificationTime}>{notification.timestamp}</Text>
-      </View>
-
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => handleDeleteNotification(notification.id)}>
-        <Icon name="close" size={20} color={Colors.textLight} />
-      </TouchableOpacity>
-    </TouchableOpacity>
+  // Load notifications when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadNotifications();
+    }, [])
   );
+
+  const loadNotifications = async () => {
+    try {
+      setLoading(true);
+      const response = await NotificationService.getNotifications();
+console.log( 'JB Catch the error :' .response);
+      if (response.success) {
+        setNotifications(response.data || []);
+        // Count unread notifications
+        const unread = response.data?.filter(n => !n.is_read).length || 0;
+        setUnreadCount(unread);
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: response.message || 'Failed to load notifications',
+        });
+      }
+    } catch (error) {
+      console.error('Load notifications error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'An error occurred while loading notifications',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadNotifications();
+    setRefreshing(false);
+  };
+
+  const handleMarkAsRead = async (id) => {
+    try {
+      const response = await NotificationService.markAsRead(id);
+
+      if (response.success) {
+        // Update local state
+        setNotifications(notifications.map(notif => 
+          notif.id === id ? { ...notif, is_read: true, read_at: new Date().toISOString() } : notif
+        ));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Mark as read error:', error);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      const response = await NotificationService.markAllAsRead();
+
+      if (response.success) {
+        // Update all notifications to read
+        setNotifications(notifications.map(notif => ({
+          ...notif,
+          is_read: true,
+          read_at: new Date().toISOString(),
+        })));
+        setUnreadCount(0);
+
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'All notifications marked as read',
+        });
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: response.message || 'Failed to mark all as read',
+        });
+      }
+    } catch (error) {
+      console.error('Mark all as read error:', error);
+    }
+  };
+
+  const handleDeleteNotification = async (id) => {
+    Alert.alert(
+      'Delete Notification',
+      'Are you sure you want to delete this notification?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const response = await NotificationService.deleteNotification(id);
+
+              if (response.success) {
+                // Remove from local state
+                const notification = notifications.find(n => n.id === id);
+                setNotifications(notifications.filter(notif => notif.id !== id));
+                
+                // Update unread count if deleted notification was unread
+                if (notification && !notification.is_read) {
+                  setUnreadCount(prev => Math.max(0, prev - 1));
+                }
+
+                Toast.show({
+                  type: 'success',
+                  text1: 'Deleted',
+                  text2: 'Notification deleted successfully',
+                });
+              } else {
+                Toast.show({
+                  type: 'error',
+                  text1: 'Error',
+                  text2: response.message || 'Failed to delete notification',
+                });
+              }
+            } catch (error) {
+              console.error('Delete notification error:', error);
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: 'An error occurred while deleting',
+              });
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const getNotificationIcon = (type) => {
+    switch (type) {
+      case 'transaction':
+        return { icon: 'account-balance-wallet', color: Colors.success };
+      case 'transfer':
+        return { icon: 'send', color: Colors.primary };
+      case 'security':
+        return { icon: 'security', color: Colors.warning };
+      case 'bill_payment':
+      case 'bill':
+        return { icon: 'receipt', color: '#2196f3' };
+      case 'promo':
+      case 'promotional':
+        return { icon: 'local-offer', color: '#ff9800' };
+      case 'system':
+        return { icon: 'info', color: Colors.info };
+      case 'alert':
+        return { icon: 'warning', color: Colors.error };
+      default:
+        return { icon: 'notifications', color: Colors.primary };
+    }
+  };
+
+  const formatTimestamp = (timestamp) => {
+    return moment(timestamp).fromNow();
+  };
+
+  const renderNotification = (notification) => {
+    const { icon, color } = getNotificationIcon(notification.type);
+
+    return (
+      <TouchableOpacity
+        key={notification.id}
+        style={[
+          styles.notificationCard,
+          !notification.is_read && styles.unreadCard,
+        ]}
+        onPress={() => handleMarkAsRead(notification.id)}>
+        <View style={[styles.iconContainer, { backgroundColor: color + '20' }]}>
+          <Icon name={icon} size={24} color={color} />
+        </View>
+        
+        <View style={styles.notificationContent}>
+          <View style={styles.notificationHeader}>
+            <Text style={styles.notificationTitle}>{notification.title}</Text>
+            {!notification.is_read && <View style={styles.unreadDot} />}
+          </View>
+          <Text style={styles.notificationMessage}>{notification.message}</Text>
+          <Text style={styles.notificationTime}>
+            {formatTimestamp(notification.created_at)}
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => handleDeleteNotification(notification.id)}>
+          <Icon name="close" size={20} color={Colors.textLight} />
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -149,10 +252,19 @@ const NotificationsScreen = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[Colors.primary]}
+            tintColor={Colors.primary}
+          />
         }>
         
-        {notifications.length > 0 ? (
+        {loading && notifications.length === 0 ? (
+          <View style={styles.loadingState}>
+            <Text style={styles.loadingText}>Loading notifications...</Text>
+          </View>
+        ) : notifications.length > 0 ? (
           notifications.map(renderNotification)
         ) : (
           <View style={styles.emptyState}>
@@ -206,6 +318,16 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: Spacing.md,
+  },
+  loadingState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.xl * 2,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontFamily: Fonts.regular,
+    color: Colors.textLight,
   },
   notificationCard: {
     flexDirection: 'row',

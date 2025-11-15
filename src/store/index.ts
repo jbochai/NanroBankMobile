@@ -9,13 +9,15 @@ import accountReducer from './account/accountSlice';
 import transactionReducer from './transaction/transactionSlice';
 import transferReducer from './transfer/transferSlice';
 import billPaymentReducer from './bill/billPaymentSlice';
+import notificationReducer from './notification/notificationSlice';
+
 
 // Persist config
 const persistConfig = {
   key: 'root',
   storage: AsyncStorage,
   whitelist: ['auth'], // Only persist auth state
-  blacklist: ['account', 'transaction', 'transfer', 'billPayment'], // Don't persist these
+  blacklist: ['account', 'transaction', 'transfer', 'billPayment', 'notification'], // Don't persist these
 };
 
 // Combine reducers
@@ -25,6 +27,7 @@ const rootReducer = combineReducers({
   transaction: transactionReducer,
   transfer: transferReducer,
   billPayment: billPaymentReducer,
+  notification: notificationReducer, // Added notification reducer
 });
 
 // Create persisted reducer
